@@ -22,7 +22,7 @@
 | 单元测试 | Vitest (`4.1.7`) | 覆盖搜索归一化与 Worker 路由逻辑 |
 | 搜索代理 | Vite dev proxy（开发）/ Cloudflare Workers（生产） | 同构路由表，规避浏览器 CORS；支持 CORS 的源浏览器直连 |
 | 部署 | GitHub Pages + GitHub Actions（Node 20） | 推送 main 自动构建并发布 |
-| 数据源 | Bangumi、Bilibili、萌娘百科、AniList（GraphQL）、VNDB、月幕Galgame | 6 源并行聚合 |
+| 数据源 | Bangumi、Bilibili、萌娘百科、AniList（GraphQL）、VNDB、月幕Galgame | 6 源并行聚合（AniList 拆动画/漫画两个 chip，共 7 个来源选项） |
 
 ## 运行
 

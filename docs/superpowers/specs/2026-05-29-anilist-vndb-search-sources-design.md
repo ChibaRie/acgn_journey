@@ -81,7 +81,7 @@ query ($search: String, $type: MediaType) {
 | `summary` | `stripHtml(description)`（复用现有 stripHtml） |
 | `releaseDate` / `releaseYear` | `startDate.year` |
 | `tags` | `genres` + `tags[].name`，过 `uniqueTags()` |
-| `meta` | `[year, averageScore ? '{score} 分' : '']` 过滤空值 |
+| `meta` | `[year, averageScore ? '{(averageScore/10).toFixed(1)} 分' : '']` 过滤空值（averageScore 为 0–100，除 10 对齐 10 分制） |
 
 错误处理：GraphQL 出错也常返回 HTTP 200，错误在 `json.errors`。`searchAniList` 检查 `if (json.errors?.length) throw new Error(...)`，同 `searchBilibili` 检查 `json.code !== 0` 的模式。
 

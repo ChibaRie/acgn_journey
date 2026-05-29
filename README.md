@@ -1,6 +1,6 @@
 # My ACGN Journey
 
-个人 ACGN 作品记录管理应用。当前版本是 React + Vite 单页应用，搜索侧聚合 Bangumi、Bilibili、萌娘百科、AniList（动画/漫画）与 VNDB，本地库数据保存到浏览器 `LocalStorage`。
+个人 ACGN 作品记录管理应用。当前版本是 React + Vite 单页应用，搜索侧聚合 Bangumi、Bilibili、萌娘百科、AniList（动画/漫画）、VNDB 与月幕Galgame，本地库数据保存到浏览器 `LocalStorage`。
 
 当前版本：`v0.3`
 
@@ -20,9 +20,9 @@
 | 样式 | 原生 CSS + CSS Variables | 零依赖，`data-theme` 切换暗夜/日间双主题 |
 | 状态与持久化 | `useLibrary` Hook + LocalStorage | 单键存储，自动同步，无外部状态库 |
 | 单元测试 | Vitest (`4.1.7`) | 覆盖搜索归一化与 Worker 路由逻辑 |
-| 搜索代理 | Vite dev proxy（开发）/ Cloudflare Workers（生产） | 同构路由表，规避浏览器 CORS |
+| 搜索代理 | Vite dev proxy（开发）/ Cloudflare Workers（生产） | 同构路由表，规避浏览器 CORS；支持 CORS 的源浏览器直连 |
 | 部署 | GitHub Pages + GitHub Actions（Node 20） | 推送 main 自动构建并发布 |
-| 数据源 | Bangumi、Bilibili、萌娘百科、AniList（GraphQL）、VNDB | 5 源并行聚合 |
+| 数据源 | Bangumi、Bilibili、萌娘百科、AniList（GraphQL）、VNDB、月幕Galgame | 6 源并行聚合 |
 
 ## 运行
 
@@ -47,7 +47,7 @@ Windows 用户也可以直接双击：
 
 ## 已实现功能
 
-- 多源作品搜索：Bangumi、Bilibili 番剧搜索、萌娘百科 MediaWiki 查询、AniList（动画/漫画，GraphQL）、VNDB（视觉小说/Galgame）。
+- 多源作品搜索：Bangumi、Bilibili 番剧搜索、萌娘百科 MediaWiki 查询、AniList（动画/漫画，GraphQL）、VNDB（视觉小说/Galgame）、月幕Galgame（Galgame）。
 - 搜索结果展示：标题、封面、类型、简介、来源站点和来源链接。
 - 各源会提取标签：Bangumi/萌娘百科取 tag/分类，Bilibili 取番剧风格/地区，AniList 取 genres/tags，VNDB 按权重取 tag。
 - 一键加入我的库：默认标记为完成状态，并按类型显示“已看 / 已读 / 已玩”。
@@ -68,6 +68,7 @@ Windows 用户也可以直接双击：
 - **新增两个搜索源**：AniList（动画/漫画，GraphQL API，拆为「AniList动画」「AniList漫画」两个独立可开关的源）与 VNDB（视觉小说/Galgame，Kana HTTPS API）。搜索栏来源 chip 由 3 个扩展到 6 个。
 - **在线部署**：可部署为 GitHub Pages 静态站 + Cloudflare Worker 搜索代理。前端通过 `VITE_API_BASE` 环境变量在 dev（Vite 代理）与 prod（Worker）间切换，详见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 - **引入单元测试**：新增 Vitest，覆盖各源搜索结果归一化与 Worker 路由逻辑。
+- **大陆可达性优化**：Bangumi、萌娘百科改为浏览器直连官方 API（支持 CORS），大陆网络无需代理即可搜索；新增月幕Galgame（ymgal）作为需代理的 Galgame 源（Worker 端注入 OAuth token、内存缓存约 55 分钟）。
 - 说明：仍为优先本地运行的纯前端版本。授权 API 同步入口已在界面预留，但 OAuth 回调与令牌保存应放到后端或 Serverless 中实现，不建议把长期访问令牌放在浏览器本地代码里。
 
 ### v0.2
@@ -80,19 +81,25 @@ Windows 用户也可以直接双击：
 
 ## 跨域方案
 
-浏览器页面只访问 `/api/<源>` 路径，由代理转发到上游：
+搜索源分两类：**直连源**（Bangumi、萌娘百科，支持 CORS，浏览器直接访问官方 API，大陆网络无需代理即可用）与**需代理源**（Bilibili、AniList、VNDB、月幕Galgame，需经代理转发）。即使代理不可用，直连源仍可正常搜索。
 
-- `/api/bangumi/*` -> `https://api.bgm.tv/*`
+需代理源只访问 `/api/<源>` 路径，由代理转发到上游：
+
 - `/api/bilibili/*` -> `https://api.bilibili.com/*`
-- `/api/moegirl/*` -> `https://zh.moegirl.org.cn/*`
 - `/api/anilist` -> `https://graphql.anilist.co`
 - `/api/vndb/*` -> `https://api.vndb.org/kana/*`
+- `/api/ymgal/*` -> `https://www.ymgal.games/*`（Worker 端注入 OAuth token）
 
-**本地开发**通过 [vite.config.js](vite.config.js) 的 dev server 代理转发；**生产环境**通过 Cloudflare Worker（[worker/](worker/)）转发，路由表与 dev 代理结构一致。前端用 `VITE_API_BASE` 环境变量切换两者，dev 为空走 Vite 代理、prod 指向 Worker。
+**本地开发**通过 [vite.config.js](vite.config.js) 的 dev server 代理转发；**生产环境**通过 Cloudflare Worker（[worker/](worker/)）转发，路由表与 dev 代理结构一致。前端用 `VITE_API_BASE` 环境变量切换两者，dev 为空走 Vite 代理、prod 指向 Worker。直连源不经此机制，直接访问官方域名。
 
 ## 设计与数据模型
 
 完整架构、数据模型和扩展方案见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
+## 数据来源
+
+- 作品数据来自 Bangumi、Bilibili、萌娘百科、AniList、VNDB 与 [月幕Galgame](https://www.ymgal.games)。
+- 月幕Galgame 数据通过其公开 API 获取，仅用于非商业的个人记录用途。
 
 ## License
 

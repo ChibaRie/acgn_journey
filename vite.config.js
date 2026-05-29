@@ -41,6 +41,20 @@ export default defineConfig({
         headers: browserLikeHeaders,
         rewrite: (path) => path.replace(/^\/api\/moegirl/, ''),
       },
+      '/api/anilist': {
+        target: 'https://graphql.anilist.co',
+        changeOrigin: true,
+        secure: true,
+        headers: browserLikeHeaders,
+        rewrite: (path) => path.replace(/^\/api\/anilist/, ''),
+      },
+      '/api/vndb': {
+        target: 'https://api.vndb.org/kana',
+        changeOrigin: true,
+        secure: true,
+        headers: browserLikeHeaders,
+        rewrite: (path) => path.replace(/^\/api\/vndb/, ''),
+      },
     },
   },
 });

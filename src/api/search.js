@@ -270,8 +270,8 @@ export function normalizeVndbItem(vn) {
   };
 }
 
-async function searchMoegirl(keyword, signal) {
-  const params = new URLSearchParams({
+export function buildMoegirlParams(keyword) {
+  return new URLSearchParams({
     action: 'query',
     format: 'json',
     formatversion: '2',
@@ -288,7 +288,12 @@ async function searchMoegirl(keyword, signal) {
     cllimit: '20',
     inprop: 'url',
     utf8: '1',
+    origin: '*',
   });
+}
+
+async function searchMoegirl(keyword, signal) {
+  const params = buildMoegirlParams(keyword);
 
   const json = await fetchJson(directApiUrl('moegirl', `/api.php?${params}`), { signal });
   return (json.query?.pages || []).map(normalizeMoegirlItem);

@@ -153,3 +153,13 @@ describe('directApiUrl', () => {
     expect(Object.keys(DIRECT_BASES).sort()).toEqual(['bangumi', 'moegirl']);
   });
 });
+
+import { buildMoegirlParams } from './search.js';
+
+describe('buildMoegirlParams', () => {
+  it('includes origin=* to enable MediaWiki CORS', () => {
+    const params = buildMoegirlParams('芙莉莲');
+    expect(params.get('origin')).toBe('*');
+    expect(params.get('gsrsearch')).toBe('芙莉莲');
+  });
+});

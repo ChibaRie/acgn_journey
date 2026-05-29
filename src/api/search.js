@@ -12,6 +12,12 @@ const BANGUMI_TYPE_LABELS = {
   6: '三次元',
 };
 
+const ANILIST_MANGA_FORMAT_LABELS = {
+  MANGA: '漫画',
+  ONE_SHOT: '漫画',
+  NOVEL: '轻小说/书籍',
+};
+
 function stripHtml(value = '') {
   return String(value)
     .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -193,6 +199,34 @@ function normalizeMoegirlItem(page) {
     releaseYear,
     tags,
     meta: uniqueTags(['萌娘百科', releaseYear], 3),
+  };
+}
+
+export function normalizeAniListItem(media, source) {
+  const title = media.title?.native || media.title?.romaji || media.title?.english || '未命名条目';
+  const romaji = media.title?.romaji || '';
+  const year = media.startDate?.year ? String(media.startDate.year) : '';
+  const type =
+    source === 'anilist_manga'
+      ? ANILIST_MANGA_FORMAT_LABELS[media.format] || '漫画'
+      : '动画';
+  const score = media.averageScore ? `${(media.averageScore / 10).toFixed(1)} 分` : '';
+
+  return {
+    id: `anilist-${media.id}`,
+    source,
+    sourceLabel: SOURCE_LABELS[source],
+    sourceId: String(media.id),
+    sourceUrl: media.siteUrl || `https://anilist.co/${source === 'anilist_manga' ? 'manga' : 'anime'}/${media.id}`,
+    title,
+    originalTitle: romaji && romaji !== title ? romaji : '',
+    cover: normalizeUrl(media.coverImage?.large || media.coverImage?.medium || ''),
+    type,
+    summary: stripHtml(media.description || ''),
+    releaseDate: year,
+    releaseYear: year,
+    tags: uniqueTags([...(media.genres || []), ...(media.tags || []).map((tag) => tag.name)]),
+    meta: [year, score].filter(Boolean),
   };
 }
 

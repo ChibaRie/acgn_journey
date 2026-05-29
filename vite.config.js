@@ -46,7 +46,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
         headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/anilist/, ''),
+        rewrite: (path) => path.replace(/^\/api\/anilist/, '') || '/',
       },
       '/api/vndb': {
         target: 'https://api.vndb.org/kana',

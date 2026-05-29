@@ -2,7 +2,7 @@
 
 个人 ACGN 作品记录管理应用。当前版本是 React + Vite 单页应用，搜索侧通过 Vite dev server 代理聚合 Bangumi、Bilibili 与萌娘百科，本地库数据保存到浏览器 `LocalStorage`。
 
-当前版本：`v0.2`
+当前版本：`v0.3`
 
 ## 运行
 

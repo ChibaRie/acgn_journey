@@ -172,7 +172,7 @@ export default function App() {
 
       <main className="workspace">
         {activeTab === 'search' && (
-          <SearchPanel records={records} hasWork={hasWork} onAddWork={handleAddWork} />
+          <SearchPanel hasWork={hasWork} onAddWork={handleAddWork} />
         )}
 
         {activeTab === 'library' && (

@@ -4,7 +4,8 @@ import { SOURCE_LABELS, searchAllSources } from '../api/search.js';
 import WorkCard from './WorkCard.jsx';
 import EmptyState from './EmptyState.jsx';
 
-const DEFAULT_SOURCES = ['bangumi', 'bilibili', 'moegirl', 'anilist_anime', 'anilist_manga', 'vndb'];
+const DEFAULT_SOURCES = ['bangumi', 'bilibili', 'moegirl', 'anilist_anime', 'anilist_manga', 'vndb', 'ymgal'];
+const DIRECT_SOURCES = new Set(['bangumi', 'moegirl']);
 
 export default function SearchPanel({ hasWork, onAddWork }) {
   const [keyword, setKeyword] = useState('');
@@ -92,6 +93,7 @@ export default function SearchPanel({ hasWork, onAddWork }) {
             aria-pressed={sources.includes(source)}
           >
             {SOURCE_LABELS[source]}
+            {DIRECT_SOURCES.has(source) && <span className="source-direct"> · 直连</span>}
           </button>
         ))}
       </div>

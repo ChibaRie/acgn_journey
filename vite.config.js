@@ -56,6 +56,13 @@ export default defineConfig({
         headers: browserLikeHeaders,
         rewrite: (path) => path.replace(/^\/api\/vndb/, ''),
       },
+      '/api/ymgal': {
+        target: 'https://www.ymgal.games',
+        changeOrigin: true,
+        secure: true,
+        headers: browserLikeHeaders,
+        rewrite: (path) => path.replace(/^\/api\/ymgal/, ''),
+      },
     },
   },
 });

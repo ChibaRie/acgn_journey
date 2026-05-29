@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchRoute, rewritePath, corsHeaders } from './router.js';
+import { matchRoute, rewritePath, corsHeaders, shouldRefreshToken } from './router.js';
 
 describe('matchRoute', () => {
   it('matches a known prefix to its target + headers', () => {
@@ -47,5 +47,25 @@ describe('corsHeaders', () => {
     expect(h['Access-Control-Allow-Origin']).toBe('https://chibarie.github.io');
     expect(h['Access-Control-Allow-Methods']).toContain('POST');
     expect(h['Access-Control-Allow-Headers']).toContain('Content-Type');
+  });
+});
+
+describe('matchRoute ymgal', () => {
+  it('matches /api/ymgal to ymgal target with auth flag', () => {
+    const r = matchRoute('/api/ymgal/open/archive/search-game');
+    expect(r.target).toBe('https://www.ymgal.games');
+    expect(r.needsYmgalAuth).toBe(true);
+  });
+});
+
+describe('shouldRefreshToken', () => {
+  it('refreshes when no cache', () => {
+    expect(shouldRefreshToken(null, 1000)).toBe(true);
+  });
+  it('refreshes when expired', () => {
+    expect(shouldRefreshToken({ token: 'x', expiresAt: 500 }, 1000)).toBe(true);
+  });
+  it('reuses a valid cached token', () => {
+    expect(shouldRefreshToken({ token: 'x', expiresAt: 5000 }, 1000)).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ const browserLikeHeaders = {
 };
 
 export default defineConfig({
+  base: process.env.GITHUB_ACTIONS ? '/My_ACGN_Journey/' : '/',
   plugins: [react()],
   server: {
     host: '127.0.0.1',

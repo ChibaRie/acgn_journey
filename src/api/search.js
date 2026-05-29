@@ -20,6 +20,7 @@ const SOURCE_LABELS = {
   anilist_anime: 'AniList动画',
   anilist_manga: 'AniList漫画',
   vndb: 'VNDB',
+  ymgal: '月幕Galgame',
 };
 
 const BANGUMI_TYPE_LABELS = {
@@ -270,6 +271,27 @@ export function normalizeVndbItem(vn) {
   };
 }
 
+export function normalizeYmgalItem(item) {
+  const title = item.chineseName || item.name || '未命名游戏';
+  const year = getYear(item.releaseDate);
+  return {
+    id: `ymgal-${item.id}`,
+    source: 'ymgal',
+    sourceLabel: SOURCE_LABELS.ymgal,
+    sourceId: String(item.id),
+    sourceUrl: `https://www.ymgal.games/ga${item.id}`,
+    title,
+    originalTitle: item.name && item.name !== title ? item.name : '',
+    cover: normalizeUrl(item.mainImg || ''),
+    type: 'Galgame/游戏',
+    summary: '',
+    releaseDate: item.releaseDate || '',
+    releaseYear: year,
+    tags: uniqueTags([item.orgName, item.haveChinese ? '有中文' : '']),
+    meta: [item.releaseDate, item.orgName].filter(Boolean),
+  };
+}
+
 export function buildMoegirlParams(keyword) {
   return new URLSearchParams({
     action: 'query',
@@ -356,6 +378,23 @@ async function searchVndb(keyword, signal) {
   return (json.results || []).map(normalizeVndbItem);
 }
 
+async function searchYmgal(keyword, signal) {
+  const params = new URLSearchParams({
+    mode: 'list',
+    keyword,
+    pageNum: '1',
+    pageSize: '12',
+  });
+  const json = await fetchJson(buildApiUrl(`/api/ymgal/open/archive/search-game?${params}`), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (json.code !== 0) {
+    throw new Error(json.msg || `ymgal 返回 code ${json.code}`);
+  }
+  return (json.data?.result || []).map(normalizeYmgalItem);
+}
+
 const PROVIDERS = {
   bangumi: searchBangumi,
   bilibili: searchBilibili,
@@ -363,6 +402,7 @@ const PROVIDERS = {
   anilist_anime: searchAniListAnime,
   anilist_manga: searchAniListManga,
   vndb: searchVndb,
+  ymgal: searchYmgal,
 };
 
 export async function searchAllSources(keyword, { sources, signal } = {}) {

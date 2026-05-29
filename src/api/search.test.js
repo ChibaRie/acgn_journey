@@ -163,3 +163,42 @@ describe('buildMoegirlParams', () => {
     expect(params.get('gsrsearch')).toBe('芙莉莲');
   });
 });
+
+import { normalizeYmgalItem } from './search.js';
+
+const ymgalItem = {
+  id: 10886,
+  name: 'White Album',
+  chineseName: '白色相簿',
+  mainImg: 'https://cdn.ymgal.games/archive/main/75/abc.webp',
+  releaseDate: '1998-05-01',
+  orgName: 'Leaf',
+  haveChinese: true,
+};
+
+describe('normalizeYmgalItem', () => {
+  it('prefers chineseName and builds id/url/type', () => {
+    const w = normalizeYmgalItem(ymgalItem);
+    expect(w.id).toBe('ymgal-10886');
+    expect(w.source).toBe('ymgal');
+    expect(w.sourceLabel).toBe('月幕Galgame');
+    expect(w.sourceId).toBe('10886');
+    expect(w.sourceUrl).toBe('https://www.ymgal.games/ga10886');
+    expect(w.title).toBe('白色相簿');
+    expect(w.originalTitle).toBe('White Album');
+    expect(w.type).toBe('Galgame/游戏');
+    expect(w.cover).toBe('https://cdn.ymgal.games/archive/main/75/abc.webp');
+    expect(w.releaseYear).toBe('1998');
+  });
+
+  it('falls back to name when no chineseName', () => {
+    const w = normalizeYmgalItem({ ...ymgalItem, id: 1, chineseName: '' });
+    expect(w.title).toBe('White Album');
+    expect(w.originalTitle).toBe('');
+  });
+
+  it('builds tags from org and chinese flag', () => {
+    const w = normalizeYmgalItem(ymgalItem);
+    expect(w.tags).toEqual(['Leaf', '有中文']);
+  });
+});

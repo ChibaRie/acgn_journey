@@ -201,4 +201,9 @@ describe('normalizeYmgalItem', () => {
     const w = normalizeYmgalItem(ymgalItem);
     expect(w.tags).toEqual(['Leaf', '有中文']);
   });
+
+  it('omits 有中文 tag when haveChinese is false', () => {
+    const w = normalizeYmgalItem({ ...ymgalItem, haveChinese: false });
+    expect(w.tags).toEqual(['Leaf']);
+  });
 });

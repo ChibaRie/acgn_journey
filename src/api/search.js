@@ -327,7 +327,7 @@ async function searchVndb(keyword, signal) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       filters: ['search', '=', keyword],
-      fields: 'title, alttitle, image{url, sexual}, released, description, rating, length, tags{name, rating}',
+      fields: 'title, alttitle, image{url, sexual}, released, description, rating, tags{name, rating}',
       results: 12,
       sort: 'searchrank',
     }),

@@ -359,6 +359,11 @@ a {
   background: var(--control-active);
 }
 
+.source-direct {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
 .category-row {
   display: flex;
   flex-wrap: wrap;

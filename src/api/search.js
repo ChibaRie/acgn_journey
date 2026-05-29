@@ -4,6 +4,15 @@ export function buildApiUrl(path, base = API_BASE) {
   return base ? `${base.replace(/\/$/, '')}${path}` : path;
 }
 
+export const DIRECT_BASES = {
+  bangumi: 'https://api.bgm.tv',
+  moegirl: 'https://zh.moegirl.org.cn',
+};
+
+export function directApiUrl(source, path) {
+  return `${DIRECT_BASES[source]}${path}`;
+}
+
 const SOURCE_LABELS = {
   bangumi: 'Bangumi',
   bilibili: 'Bilibili',
@@ -11,6 +20,7 @@ const SOURCE_LABELS = {
   anilist_anime: 'AniList动画',
   anilist_manga: 'AniList漫画',
   vndb: 'VNDB',
+  ymgal: '月幕Galgame',
 };
 
 const BANGUMI_TYPE_LABELS = {
@@ -129,7 +139,7 @@ async function searchBangumi(keyword, signal) {
     },
   };
 
-  const json = await fetchJson(buildApiUrl('/api/bangumi/v0/search/subjects?limit=12&offset=0'), {
+  const json = await fetchJson(directApiUrl('bangumi', '/v0/search/subjects?limit=12&offset=0'), {
     method: 'POST',
     signal,
     headers: {
@@ -261,8 +271,29 @@ export function normalizeVndbItem(vn) {
   };
 }
 
-async function searchMoegirl(keyword, signal) {
-  const params = new URLSearchParams({
+export function normalizeYmgalItem(item) {
+  const title = item.chineseName || item.name || '未命名游戏';
+  const year = getYear(item.releaseDate);
+  return {
+    id: `ymgal-${item.id}`,
+    source: 'ymgal',
+    sourceLabel: SOURCE_LABELS.ymgal,
+    sourceId: String(item.id),
+    sourceUrl: `https://www.ymgal.games/ga${item.id}`,
+    title,
+    originalTitle: item.name && item.name !== title ? item.name : '',
+    cover: normalizeUrl(item.mainImg || ''),
+    type: 'Galgame/游戏',
+    summary: '',
+    releaseDate: item.releaseDate || '',
+    releaseYear: year,
+    tags: uniqueTags([item.orgName, item.haveChinese ? '有中文' : '']),
+    meta: [item.releaseDate, item.orgName].filter(Boolean),
+  };
+}
+
+export function buildMoegirlParams(keyword) {
+  return new URLSearchParams({
     action: 'query',
     format: 'json',
     formatversion: '2',
@@ -279,9 +310,14 @@ async function searchMoegirl(keyword, signal) {
     cllimit: '20',
     inprop: 'url',
     utf8: '1',
+    origin: '*',
   });
+}
 
-  const json = await fetchJson(buildApiUrl(`/api/moegirl/api.php?${params}`), { signal });
+async function searchMoegirl(keyword, signal) {
+  const params = buildMoegirlParams(keyword);
+
+  const json = await fetchJson(directApiUrl('moegirl', `/api.php?${params}`), { signal });
   return (json.query?.pages || []).map(normalizeMoegirlItem);
 }
 
@@ -342,6 +378,23 @@ async function searchVndb(keyword, signal) {
   return (json.results || []).map(normalizeVndbItem);
 }
 
+async function searchYmgal(keyword, signal) {
+  const params = new URLSearchParams({
+    mode: 'list',
+    keyword,
+    pageNum: '1',
+    pageSize: '12',
+  });
+  const json = await fetchJson(buildApiUrl(`/api/ymgal/open/archive/search-game?${params}`), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (json.code !== 0) {
+    throw new Error(json.msg || `ymgal 返回 code ${json.code}`);
+  }
+  return (json.data?.result || []).map(normalizeYmgalItem);
+}
+
 const PROVIDERS = {
   bangumi: searchBangumi,
   bilibili: searchBilibili,
@@ -349,6 +402,7 @@ const PROVIDERS = {
   anilist_anime: searchAniListAnime,
   anilist_manga: searchAniListManga,
   vndb: searchVndb,
+  ymgal: searchYmgal,
 };
 
 export async function searchAllSources(keyword, { sources, signal } = {}) {

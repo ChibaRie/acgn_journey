@@ -1,0 +1,6 @@
+name = "acgn-proxy"
+main = "index.js"
+compatibility_date = "2025-05-01"
+
+[vars]
+ALLOWED_ORIGIN = "https://chibarie.github.io"

@@ -1,0 +1,123 @@
+import { describe, it, expect } from 'vitest';
+import { stripBBCode } from './search.js';
+
+describe('stripBBCode', () => {
+  it('removes url bbcode but keeps the link text', () => {
+    expect(stripBBCode('see [url=/v17]Ever17[/url] now')).toBe('see Ever17 now');
+  });
+
+  it('removes spoiler and formatting tags', () => {
+    expect(stripBBCode('[spoiler]secret[/spoiler] [b]bold[/b]')).toBe('secret bold');
+  });
+
+  it('handles empty and plain input', () => {
+    expect(stripBBCode('')).toBe('');
+    expect(stripBBCode('plain text')).toBe('plain text');
+  });
+});
+
+import { normalizeAniListItem } from './search.js';
+
+const aniListAnime = {
+  id: 21,
+  title: { romaji: 'Sousou no Frieren', english: 'Frieren', native: '葬送のフリーレン' },
+  coverImage: { large: 'https://img/large.jpg', medium: 'https://img/med.jpg' },
+  description: 'A story <br>about an elf.',
+  genres: ['Adventure', 'Drama'],
+  tags: [{ name: 'Magic' }, { name: 'Adventure' }],
+  averageScore: 89,
+  format: 'TV',
+  startDate: { year: 2023 },
+  siteUrl: 'https://anilist.co/anime/21',
+  isAdult: false,
+};
+
+describe('normalizeAniListItem', () => {
+  it('prefers native (Japanese) title', () => {
+    const work = normalizeAniListItem(aniListAnime, 'anilist_anime');
+    expect(work.title).toBe('葬送のフリーレン');
+    expect(work.originalTitle).toBe('Sousou no Frieren');
+  });
+
+  it('maps anime source to 动画 type and builds id/url', () => {
+    const work = normalizeAniListItem(aniListAnime, 'anilist_anime');
+    expect(work.id).toBe('anilist-21');
+    expect(work.source).toBe('anilist_anime');
+    expect(work.type).toBe('动画');
+    expect(work.sourceUrl).toBe('https://anilist.co/anime/21');
+    expect(work.releaseYear).toBe('2023');
+    expect(work.sourceLabel).toBe('AniList动画');
+  });
+
+  it('converts averageScore to 10-point scale in meta', () => {
+    const work = normalizeAniListItem(aniListAnime, 'anilist_anime');
+    expect(work.meta).toContain('8.9 分');
+  });
+
+  it('dedupes genres and tags', () => {
+    const work = normalizeAniListItem(aniListAnime, 'anilist_anime');
+    expect(work.tags).toEqual(['Adventure', 'Drama', 'Magic']);
+  });
+
+  it('maps manga format NOVEL to 轻小说/书籍', () => {
+    const novel = { ...aniListAnime, id: 99, format: 'NOVEL' };
+    const work = normalizeAniListItem(novel, 'anilist_manga');
+    expect(work.type).toBe('轻小说/书籍');
+  });
+
+  it('maps manga format MANGA to 漫画', () => {
+    const manga = { ...aniListAnime, id: 98, format: 'MANGA' };
+    const work = normalizeAniListItem(manga, 'anilist_manga');
+    expect(work.type).toBe('漫画');
+  });
+});
+
+import { normalizeVndbItem } from './search.js';
+
+const vndbVn = {
+  id: 'v17',
+  title: 'Ever17 -The Out of Infinity-',
+  alttitle: 'Ever17 -the out of infinity-',
+  image: { url: 'https://t.vndb.org/cv/17.jpg', sexual: 0 },
+  released: '2002-08-29',
+  description: 'A [b]sci-fi[/b] mystery. [url=/v18]sequel[/url]',
+  rating: 87,
+  length: 4,
+  tags: [
+    { name: 'Science Fiction', rating: 2.8 },
+    { name: 'Amnesia', rating: 2.1 },
+  ],
+};
+
+describe('normalizeVndbItem', () => {
+  it('builds id, source, url and fixed Galgame type', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.id).toBe('vndb-v17');
+    expect(work.source).toBe('vndb');
+    expect(work.sourceId).toBe('v17');
+    expect(work.sourceUrl).toBe('https://vndb.org/v17');
+    expect(work.type).toBe('Galgame/游戏');
+    expect(work.sourceLabel).toBe('VNDB');
+  });
+
+  it('uses default title and strips bbcode from description', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.title).toBe('Ever17 -The Out of Infinity-');
+    expect(work.summary).toBe('A sci-fi mystery. sequel');
+  });
+
+  it('converts 0-100 rating to 10-point scale', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.meta).toContain('8.7 分');
+  });
+
+  it('orders tags by rating descending', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.tags).toEqual(['Science Fiction', 'Amnesia']);
+  });
+
+  it('extracts release year', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.releaseYear).toBe('2002');
+  });
+});

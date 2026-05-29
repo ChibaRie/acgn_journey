@@ -2,6 +2,9 @@ const SOURCE_LABELS = {
   bangumi: 'Bangumi',
   bilibili: 'Bilibili',
   moegirl: '萌娘百科',
+  anilist_anime: 'AniList动画',
+  anilist_manga: 'AniList漫画',
+  vndb: 'VNDB',
 };
 
 const BANGUMI_TYPE_LABELS = {
@@ -12,6 +15,12 @@ const BANGUMI_TYPE_LABELS = {
   6: '三次元',
 };
 
+const ANILIST_MANGA_FORMAT_LABELS = {
+  MANGA: '漫画',
+  ONE_SHOT: '漫画',
+  NOVEL: '轻小说/书籍',
+};
+
 function stripHtml(value = '') {
   return String(value)
     .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -20,6 +29,14 @@ function stripHtml(value = '') {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function stripBBCode(value = '') {
+  return String(value)
+    .replace(/\[url=[^\]]*\]/gi, '')
+    .replace(/\[\/?[a-z][^\]]*\]/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -188,6 +205,56 @@ function normalizeMoegirlItem(page) {
   };
 }
 
+export function normalizeAniListItem(media, source) {
+  const title = media.title?.native || media.title?.romaji || media.title?.english || '未命名条目';
+  const romaji = media.title?.romaji || '';
+  const year = media.startDate?.year ? String(media.startDate.year) : '';
+  const type =
+    source === 'anilist_manga'
+      ? ANILIST_MANGA_FORMAT_LABELS[media.format] || '漫画'
+      : '动画';
+  const score = media.averageScore ? `${(media.averageScore / 10).toFixed(1)} 分` : '';
+
+  return {
+    id: `anilist-${media.id}`,
+    source,
+    sourceLabel: SOURCE_LABELS[source],
+    sourceId: String(media.id),
+    sourceUrl: media.siteUrl || `https://anilist.co/${source === 'anilist_manga' ? 'manga' : 'anime'}/${media.id}`,
+    title,
+    originalTitle: romaji && romaji !== title ? romaji : '',
+    cover: normalizeUrl(media.coverImage?.large || media.coverImage?.medium || ''),
+    type,
+    summary: stripHtml(media.description || ''),
+    releaseDate: year,
+    releaseYear: year,
+    tags: uniqueTags([...(media.genres || []), ...(media.tags || []).map((tag) => tag.name)]),
+    meta: [year, score].filter(Boolean),
+  };
+}
+
+export function normalizeVndbItem(vn) {
+  const sortedTags = [...(vn.tags || [])].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  const rating = vn.rating ? `${(vn.rating / 10).toFixed(1)} 分` : '';
+
+  return {
+    id: `vndb-${vn.id}`,
+    source: 'vndb',
+    sourceLabel: SOURCE_LABELS.vndb,
+    sourceId: vn.id,
+    sourceUrl: `https://vndb.org/${vn.id}`,
+    title: vn.title || '未命名作品',
+    originalTitle: vn.alttitle && vn.alttitle !== vn.title ? vn.alttitle : '',
+    cover: normalizeUrl(vn.image?.url || ''),
+    type: 'Galgame/游戏',
+    summary: stripHtml(stripBBCode(vn.description || '')),
+    releaseDate: vn.released || '',
+    releaseYear: getYear(vn.released),
+    tags: uniqueTags(sortedTags.map((tag) => tag.name)),
+    meta: [vn.released, rating].filter(Boolean),
+  };
+}
+
 async function searchMoegirl(keyword, signal) {
   const params = new URLSearchParams({
     action: 'query',
@@ -212,10 +279,70 @@ async function searchMoegirl(keyword, signal) {
   return (json.query?.pages || []).map(normalizeMoegirlItem);
 }
 
+const ANILIST_QUERY = `query ($search: String, $type: MediaType) {
+  Page(page: 1, perPage: 12) {
+    media(search: $search, type: $type, sort: SEARCH_MATCH) {
+      id
+      title { romaji english native }
+      coverImage { large medium }
+      description(asHtml: false)
+      genres
+      tags { name }
+      averageScore
+      format
+      startDate { year }
+      siteUrl
+      isAdult
+    }
+  }
+}`;
+
+async function searchAniListByType(keyword, source, mediaType, signal) {
+  const json = await fetchJson('/api/anilist', {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: ANILIST_QUERY, variables: { search: keyword, type: mediaType } }),
+  });
+
+  if (json.errors?.length) {
+    throw new Error(json.errors[0]?.message || 'AniList 查询失败');
+  }
+
+  return (json.data?.Page?.media || []).map((media) => normalizeAniListItem(media, source));
+}
+
+function searchAniListAnime(keyword, signal) {
+  return searchAniListByType(keyword, 'anilist_anime', 'ANIME', signal);
+}
+
+function searchAniListManga(keyword, signal) {
+  return searchAniListByType(keyword, 'anilist_manga', 'MANGA', signal);
+}
+
+async function searchVndb(keyword, signal) {
+  const json = await fetchJson('/api/vndb/vn', {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filters: ['search', '=', keyword],
+      fields: 'title, alttitle, image{url, sexual}, released, description, rating, tags{name, rating}',
+      results: 12,
+      sort: 'searchrank',
+    }),
+  });
+
+  return (json.results || []).map(normalizeVndbItem);
+}
+
 const PROVIDERS = {
   bangumi: searchBangumi,
   bilibili: searchBilibili,
   moegirl: searchMoegirl,
+  anilist_anime: searchAniListAnime,
+  anilist_manga: searchAniListManga,
+  vndb: searchVndb,
 };
 
 export async function searchAllSources(keyword, { sources, signal } = {}) {

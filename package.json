@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5188",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1 --port 4174"
+    "preview": "vite preview --host 127.0.0.1 --port 4174",
+    "test": "vitest run"
   },
   "dependencies": {
     "lucide-react": "^0.562.0",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.1",
-    "vite": "^7.2.6"
+    "vite": "^7.2.6",
+    "vitest": "^4.1.7"
   }
 }

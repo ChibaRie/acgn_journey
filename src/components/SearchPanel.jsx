@@ -4,7 +4,7 @@ import { SOURCE_LABELS, searchAllSources } from '../api/search.js';
 import WorkCard from './WorkCard.jsx';
 import EmptyState from './EmptyState.jsx';
 
-const DEFAULT_SOURCES = ['bangumi', 'bilibili', 'moegirl'];
+const DEFAULT_SOURCES = ['bangumi', 'bilibili', 'moegirl', 'anilist_anime', 'anilist_manga', 'vndb'];
 
 export default function SearchPanel({ hasWork, onAddWork }) {
   const [keyword, setKeyword] = useState('');

@@ -1,8 +1,14 @@
 # My ACGN Journey
 
-个人 ACGN 作品记录管理应用。当前版本是 React + Vite 单页应用，搜索侧通过 Vite dev server 代理聚合 Bangumi、Bilibili 与萌娘百科，本地库数据保存到浏览器 `LocalStorage`。
+个人 ACGN 作品记录管理应用。当前版本是 React + Vite 单页应用，搜索侧聚合 Bangumi、Bilibili、萌娘百科、AniList（动画/漫画）与 VNDB，本地库数据保存到浏览器 `LocalStorage`。
 
 当前版本：`v0.3`
+
+## 在线访问
+
+线上地址：https://chibarie.github.io/My_ACGN_Journey/
+
+本地库数据保存在浏览器，多源搜索通过 Cloudflare Worker 代理访问 Bangumi、Bilibili、萌娘百科、AniList、VNDB。部署方式见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
 ## 运行
 
@@ -27,9 +33,9 @@ Windows 用户也可以直接双击：
 
 ## 已实现功能
 
-- 多源作品搜索：Bangumi、Bilibili 番剧搜索、萌娘百科 MediaWiki 查询。
+- 多源作品搜索：Bangumi、Bilibili 番剧搜索、萌娘百科 MediaWiki 查询、AniList（动画/漫画，GraphQL）、VNDB（视觉小说/Galgame）。
 - 搜索结果展示：标题、封面、类型、简介、来源站点和来源链接。
-- Bangumi 与萌娘百科搜索结果会提取 tag；Bilibili 会兼容提取番剧风格/地区等标签。
+- 各源会提取标签：Bangumi/萌娘百科取 tag/分类，Bilibili 取番剧风格/地区，AniList 取 genres/tags，VNDB 按权重取 tag。
 - 一键加入我的库：默认标记为完成状态，并按类型显示“已看 / 已读 / 已玩”。
 - 我的库管理：编辑标题、类型、作品年份、状态、日期、评分、短评、标签；删除记录。
 - 我的库分类：支持按 Galgame、轻小说、动漫、漫画、其他和作品年份筛选。
@@ -41,19 +47,21 @@ Windows 用户也可以直接双击：
 - 关系图谱：可建立系列作品、同一世界观、同一作者/会社、改编关系、衍生作品等关系，并用节点图展示。
 - 批量导入：支持 Bangumi、MyAnimeList、AniList、VNDB 或通用 CSV 导入，也支持 MyAnimeList XML 导入；导入前可预览，支持合并或覆盖。
 
-## v0.2 说明
+## v0.3 说明
 
-当前仍是优先本地运行的纯前端版本。批量导入已经完成离线 XML/CSV 文件解析；授权 API 同步入口已在界面中预留，但 OAuth 回调、令牌保存和跨域代理应放到后端或 Serverless 中实现，不建议把长期访问令牌直接放在浏览器本地代码里。
+优先本地运行的纯前端版本，可部署为 GitHub Pages 静态站 + Cloudflare Worker 搜索代理（见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)）。批量导入已完成离线 XML/CSV 文件解析；授权 API 同步入口已在界面中预留，但 OAuth 回调、令牌保存应放到后端或 Serverless 中实现，不建议把长期访问令牌直接放在浏览器本地代码里。
 
 ## 跨域方案
 
-浏览器页面只访问本地相对路径：
+浏览器页面只访问 `/api/<源>` 路径，由代理转发到上游：
 
 - `/api/bangumi/*` -> `https://api.bgm.tv/*`
 - `/api/bilibili/*` -> `https://api.bilibili.com/*`
 - `/api/moegirl/*` -> `https://zh.moegirl.org.cn/*`
+- `/api/anilist` -> `https://graphql.anilist.co`
+- `/api/vndb/*` -> `https://api.vndb.org/kana/*`
 
-这些代理配置在 [vite.config.js](vite.config.js) 中。后期如果需要部署为静态站，建议把同样的转发逻辑迁移到 Express、Cloudflare Workers、Vercel Functions 或 Nginx。
+**本地开发**通过 [vite.config.js](vite.config.js) 的 dev server 代理转发；**生产环境**通过 Cloudflare Worker（[worker/](worker/)）转发，路由表与 dev 代理结构一致。前端用 `VITE_API_BASE` 环境变量切换两者，dev 为空走 Vite 代理、prod 指向 Worker。
 
 ## 设计与数据模型
 

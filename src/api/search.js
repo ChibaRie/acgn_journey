@@ -150,6 +150,13 @@ async function searchBangumi(keyword, signal) {
   return (json.data || []).map(normalizeBangumiItem);
 }
 
+export function isMoegirlWork(page) {
+  const categories = (page.categories || []).map((category) =>
+    String(category.title || '').replace(/^Category:/i, '').replace(/^分类:/, ''),
+  );
+  return categories.some((name) => /(作品|题材)$/.test(name));
+}
+
 function normalizeMoegirlItem(page) {
   const title = stripHtml(page.title || '未命名页面');
   const tags = uniqueTags((page.categories || []).map((category) => category.title), 10);
@@ -259,7 +266,7 @@ export function buildMoegirlParams(keyword) {
     exchars: '160',
     piprop: 'thumbnail',
     pithumbsize: '360',
-    cllimit: '20',
+    cllimit: 'max',
     inprop: 'url',
     utf8: '1',
     origin: '*',
@@ -270,7 +277,7 @@ async function searchMoegirl(keyword, signal) {
   const params = buildMoegirlParams(keyword);
 
   const json = await fetchJson(directApiUrl('moegirl', `/api.php?${params}`), { signal });
-  return (json.query?.pages || []).map(normalizeMoegirlItem);
+  return (json.query?.pages || []).filter(isMoegirlWork).map(normalizeMoegirlItem);
 }
 
 const ANILIST_QUERY = `query ($search: String, $type: MediaType) {

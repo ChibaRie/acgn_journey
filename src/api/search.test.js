@@ -162,6 +162,48 @@ describe('buildMoegirlParams', () => {
     expect(params.get('origin')).toBe('*');
     expect(params.get('gsrsearch')).toBe('芙莉莲');
   });
+
+  it('requests the full category list to avoid batch-wide truncation', () => {
+    expect(buildMoegirlParams('x').get('cllimit')).toBe('max');
+  });
+});
+
+import { isMoegirlWork } from './search.js';
+
+const cats = (...names) => ({ categories: names.map((title) => ({ title: `Category:${title}` })) });
+
+describe('isMoegirlWork', () => {
+  it('keeps pages with a 作品 category (anime/game/novel/music)', () => {
+    expect(isMoegirlWork(cats('日本动画作品', '校园题材'))).toBe(true);
+    expect(isMoegirlWork(cats('日本游戏作品'))).toBe(true);
+    expect(isMoegirlWork(cats('日本音乐作品', '片尾曲'))).toBe(true);
+  });
+
+  it('keeps pages whose only signal is a 题材 category', () => {
+    expect(isMoegirlWork(cats('凉宫春日系列', '恋爱题材'))).toBe(true);
+  });
+
+  it('drops character pages (配音角色 / 萌属性, no 作品/题材)', () => {
+    expect(isMoegirlWork(cats('凉宫春日系列', '平野绫配音角色', '傲娇', '马尾'))).toBe(false);
+  });
+
+  it('drops element/setting pages', () => {
+    expect(isMoegirlWork(cats('命运石之门系列', '特殊能力'))).toBe(false);
+    expect(isMoegirlWork(cats('命运石之门系列', '虚构事物'))).toBe(false);
+  });
+
+  it('drops pages that only carry the franchise series category', () => {
+    expect(isMoegirlWork(cats('命运石之门系列'))).toBe(false);
+  });
+
+  it('drops pages with missing or empty categories', () => {
+    expect(isMoegirlWork({})).toBe(false);
+    expect(isMoegirlWork({ categories: [] })).toBe(false);
+  });
+
+  it('handles the 分类: prefix variant', () => {
+    expect(isMoegirlWork({ categories: [{ title: '分类:日本动画作品' }] })).toBe(true);
+  });
 });
 
 import { normalizeYmgalItem } from './search.js';

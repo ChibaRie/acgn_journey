@@ -16,6 +16,11 @@ describe('matchRoute', () => {
     expect(matchRoute('/api/evil/passthrough')).toBeNull();
     expect(matchRoute('/')).toBeNull();
   });
+
+  it('rejects a sibling path with a suffix (prefix-confusion guard)', () => {
+    expect(matchRoute('/api/bangumiXYZ')).toBeNull();
+    expect(matchRoute('/api/vndbextra/x')).toBeNull();
+  });
 });
 
 describe('rewritePath', () => {
@@ -29,6 +34,10 @@ describe('rewritePath', () => {
 
   it('keeps vndb subpath', () => {
     expect(rewritePath('/api/vndb', '/api/vndb/vn')).toBe('/vn');
+  });
+
+  it('collapses a leading double slash so the remainder cannot be protocol-relative', () => {
+    expect(rewritePath('/api/bangumi', '/api/bangumi//evil.com/x')).toBe('/evil.com/x');
   });
 });
 

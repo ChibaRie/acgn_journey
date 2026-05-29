@@ -20,7 +20,8 @@ export function matchRoute(pathname) {
 }
 
 export function rewritePath(prefix, pathname) {
-  return pathname.slice(prefix.length) || '/';
+  const remainder = pathname.slice(prefix.length).replace(/^\/+/, '/');
+  return remainder || '/';
 }
 
 export function corsHeaders(allowedOrigin) {

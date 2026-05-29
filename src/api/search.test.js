@@ -70,3 +70,52 @@ describe('normalizeAniListItem', () => {
     expect(work.type).toBe('漫画');
   });
 });
+
+import { normalizeVndbItem } from './search.js';
+
+const vndbVn = {
+  id: 'v17',
+  title: 'Ever17 -The Out of Infinity-',
+  alttitle: 'Ever17 -the out of infinity-',
+  image: { url: 'https://t.vndb.org/cv/17.jpg', sexual: 0 },
+  released: '2002-08-29',
+  description: 'A [b]sci-fi[/b] mystery. [url=/v18]sequel[/url]',
+  rating: 87,
+  length: 4,
+  tags: [
+    { name: 'Science Fiction', rating: 2.8 },
+    { name: 'Amnesia', rating: 2.1 },
+  ],
+};
+
+describe('normalizeVndbItem', () => {
+  it('builds id, source, url and fixed Galgame type', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.id).toBe('vndb-v17');
+    expect(work.source).toBe('vndb');
+    expect(work.sourceId).toBe('v17');
+    expect(work.sourceUrl).toBe('https://vndb.org/v17');
+    expect(work.type).toBe('Galgame/游戏');
+  });
+
+  it('uses default title and strips bbcode from description', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.title).toBe('Ever17 -The Out of Infinity-');
+    expect(work.summary).toBe('A sci-fi mystery. sequel');
+  });
+
+  it('converts 0-100 rating to 10-point scale', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.meta).toContain('8.7 分');
+  });
+
+  it('orders tags by rating descending', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.tags).toEqual(['Science Fiction', 'Amnesia']);
+  });
+
+  it('extracts release year', () => {
+    const work = normalizeVndbItem(vndbVn);
+    expect(work.releaseYear).toBe('2002');
+  });
+});

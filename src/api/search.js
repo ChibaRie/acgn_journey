@@ -230,6 +230,28 @@ export function normalizeAniListItem(media, source) {
   };
 }
 
+export function normalizeVndbItem(vn) {
+  const sortedTags = [...(vn.tags || [])].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  const rating = vn.rating ? `${(vn.rating / 10).toFixed(1)} 分` : '';
+
+  return {
+    id: `vndb-${vn.id}`,
+    source: 'vndb',
+    sourceLabel: SOURCE_LABELS.vndb,
+    sourceId: vn.id,
+    sourceUrl: `https://vndb.org/${vn.id}`,
+    title: vn.title || '未命名作品',
+    originalTitle: vn.alttitle && vn.alttitle !== vn.title ? vn.alttitle : '',
+    cover: normalizeUrl(vn.image?.url || ''),
+    type: 'Galgame/游戏',
+    summary: stripHtml(stripBBCode(vn.description || '')),
+    releaseDate: vn.released || '',
+    releaseYear: getYear(vn.released),
+    tags: uniqueTags(sortedTags.map((tag) => tag.name)),
+    meta: [vn.released, rating].filter(Boolean),
+  };
+}
+
 async function searchMoegirl(keyword, signal) {
   const params = new URLSearchParams({
     action: 'query',

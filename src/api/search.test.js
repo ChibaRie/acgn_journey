@@ -121,3 +121,19 @@ describe('normalizeVndbItem', () => {
     expect(work.releaseYear).toBe('2002');
   });
 });
+
+import { buildApiUrl } from './search.js';
+
+describe('buildApiUrl', () => {
+  it('keeps bare /api path when API_BASE is empty (dev)', () => {
+    expect(buildApiUrl('/api/bangumi/v0/search')).toBe('/api/bangumi/v0/search');
+  });
+
+  it('prefixes API_BASE when set (prod simulated)', () => {
+    expect(buildApiUrl('/api/vndb/vn', 'https://w.example.dev')).toBe('https://w.example.dev/api/vndb/vn');
+  });
+
+  it('strips a trailing slash on the base to avoid double slashes', () => {
+    expect(buildApiUrl('/api/anilist', 'https://w.example.dev/')).toBe('https://w.example.dev/api/anilist');
+  });
+});

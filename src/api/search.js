@@ -1,3 +1,9 @@
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+
+export function buildApiUrl(path, base = API_BASE) {
+  return base ? `${base.replace(/\/$/, '')}${path}` : path;
+}
+
 const SOURCE_LABELS = {
   bangumi: 'Bangumi',
   bilibili: 'Bilibili',
@@ -123,7 +129,7 @@ async function searchBangumi(keyword, signal) {
     },
   };
 
-  const json = await fetchJson('/api/bangumi/v0/search/subjects?limit=12&offset=0', {
+  const json = await fetchJson(buildApiUrl('/api/bangumi/v0/search/subjects?limit=12&offset=0'), {
     method: 'POST',
     signal,
     headers: {
@@ -168,7 +174,7 @@ async function searchBilibili(keyword, signal) {
     keyword,
     page: '1',
   });
-  const json = await fetchJson(`/api/bilibili/x/web-interface/search/type?${params}`, {
+  const json = await fetchJson(buildApiUrl(`/api/bilibili/x/web-interface/search/type?${params}`), {
     signal,
     headers: {
       Accept: 'application/json,text/plain,*/*',
@@ -275,7 +281,7 @@ async function searchMoegirl(keyword, signal) {
     utf8: '1',
   });
 
-  const json = await fetchJson(`/api/moegirl/api.php?${params}`, { signal });
+  const json = await fetchJson(buildApiUrl(`/api/moegirl/api.php?${params}`), { signal });
   return (json.query?.pages || []).map(normalizeMoegirlItem);
 }
 
@@ -298,7 +304,7 @@ const ANILIST_QUERY = `query ($search: String, $type: MediaType) {
 }`;
 
 async function searchAniListByType(keyword, source, mediaType, signal) {
-  const json = await fetchJson('/api/anilist', {
+  const json = await fetchJson(buildApiUrl('/api/anilist'), {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json' },
@@ -321,7 +327,7 @@ function searchAniListManga(keyword, signal) {
 }
 
 async function searchVndb(keyword, signal) {
-  const json = await fetchJson('/api/vndb/vn', {
+  const json = await fetchJson(buildApiUrl('/api/vndb/vn'), {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json' },

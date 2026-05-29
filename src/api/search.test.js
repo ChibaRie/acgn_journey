@@ -46,6 +46,7 @@ describe('normalizeAniListItem', () => {
     expect(work.type).toBe('动画');
     expect(work.sourceUrl).toBe('https://anilist.co/anime/21');
     expect(work.releaseYear).toBe('2023');
+    expect(work.sourceLabel).toBe('AniList动画');
   });
 
   it('converts averageScore to 10-point scale in meta', () => {
@@ -96,6 +97,7 @@ describe('normalizeVndbItem', () => {
     expect(work.sourceId).toBe('v17');
     expect(work.sourceUrl).toBe('https://vndb.org/v17');
     expect(work.type).toBe('Galgame/游戏');
+    expect(work.sourceLabel).toBe('VNDB');
   });
 
   it('uses default title and strips bbcode from description', () => {

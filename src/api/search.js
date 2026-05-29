@@ -2,6 +2,9 @@ const SOURCE_LABELS = {
   bangumi: 'Bangumi',
   bilibili: 'Bilibili',
   moegirl: '萌娘百科',
+  anilist_anime: 'AniList动画',
+  anilist_manga: 'AniList漫画',
+  vndb: 'VNDB',
 };
 
 const BANGUMI_TYPE_LABELS = {
@@ -276,10 +279,70 @@ async function searchMoegirl(keyword, signal) {
   return (json.query?.pages || []).map(normalizeMoegirlItem);
 }
 
+const ANILIST_QUERY = `query ($search: String, $type: MediaType) {
+  Page(page: 1, perPage: 12) {
+    media(search: $search, type: $type, sort: SEARCH_MATCH) {
+      id
+      title { romaji english native }
+      coverImage { large medium }
+      description(asHtml: false)
+      genres
+      tags { name }
+      averageScore
+      format
+      startDate { year }
+      siteUrl
+      isAdult
+    }
+  }
+}`;
+
+async function searchAniListByType(keyword, source, mediaType, signal) {
+  const json = await fetchJson('/api/anilist', {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: ANILIST_QUERY, variables: { search: keyword, type: mediaType } }),
+  });
+
+  if (json.errors?.length) {
+    throw new Error(json.errors[0]?.message || 'AniList 查询失败');
+  }
+
+  return (json.data?.Page?.media || []).map((media) => normalizeAniListItem(media, source));
+}
+
+function searchAniListAnime(keyword, signal) {
+  return searchAniListByType(keyword, 'anilist_anime', 'ANIME', signal);
+}
+
+function searchAniListManga(keyword, signal) {
+  return searchAniListByType(keyword, 'anilist_manga', 'MANGA', signal);
+}
+
+async function searchVndb(keyword, signal) {
+  const json = await fetchJson('/api/vndb/vn', {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filters: ['search', '=', keyword],
+      fields: 'title, alttitle, image{url, sexual}, released, description, rating, length, tags{name, rating}',
+      results: 12,
+      sort: 'searchrank',
+    }),
+  });
+
+  return (json.results || []).map(normalizeVndbItem);
+}
+
 const PROVIDERS = {
   bangumi: searchBangumi,
   bilibili: searchBilibili,
   moegirl: searchMoegirl,
+  anilist_anime: searchAniListAnime,
+  anilist_manga: searchAniListManga,
+  vndb: searchVndb,
 };
 
 export async function searchAllSources(keyword, { sources, signal } = {}) {

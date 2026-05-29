@@ -7,7 +7,13 @@ async function getYmgalToken(now = Date.now()) {
   const url =
     'https://www.ymgal.games/oauth/token?grant_type=client_credentials&client_id=ymgal&client_secret=luna0327&scope=public';
   const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!resp.ok) {
+    throw new Error(`ymgal token request failed: ${resp.status}`);
+  }
   const data = await resp.json();
+  if (!data.access_token) {
+    throw new Error('ymgal token response missing access_token');
+  }
   ymgalTokenCache = { token: data.access_token, expiresAt: now + 55 * 60 * 1000 };
   return ymgalTokenCache.token;
 }

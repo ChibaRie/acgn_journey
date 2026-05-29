@@ -24,6 +24,14 @@ function stripHtml(value = '') {
     .trim();
 }
 
+export function stripBBCode(value = '') {
+  return String(value)
+    .replace(/\[url=[^\]]*\]/gi, '')
+    .replace(/\[\/?[a-z][^\]]*\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function normalizeUrl(url) {
   if (!url) return '';
   if (url.startsWith('//')) return `https:${url}`;

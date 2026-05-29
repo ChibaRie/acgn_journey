@@ -4,6 +4,15 @@ export function buildApiUrl(path, base = API_BASE) {
   return base ? `${base.replace(/\/$/, '')}${path}` : path;
 }
 
+export const DIRECT_BASES = {
+  bangumi: 'https://api.bgm.tv',
+  moegirl: 'https://zh.moegirl.org.cn',
+};
+
+export function directApiUrl(source, path) {
+  return `${DIRECT_BASES[source]}${path}`;
+}
+
 const SOURCE_LABELS = {
   bangumi: 'Bangumi',
   bilibili: 'Bilibili',
@@ -129,7 +138,7 @@ async function searchBangumi(keyword, signal) {
     },
   };
 
-  const json = await fetchJson(buildApiUrl('/api/bangumi/v0/search/subjects?limit=12&offset=0'), {
+  const json = await fetchJson(directApiUrl('bangumi', '/v0/search/subjects?limit=12&offset=0'), {
     method: 'POST',
     signal,
     headers: {
@@ -281,7 +290,7 @@ async function searchMoegirl(keyword, signal) {
     utf8: '1',
   });
 
-  const json = await fetchJson(buildApiUrl(`/api/moegirl/api.php?${params}`), { signal });
+  const json = await fetchJson(directApiUrl('moegirl', `/api.php?${params}`), { signal });
   return (json.query?.pages || []).map(normalizeMoegirlItem);
 }
 

@@ -137,3 +137,19 @@ describe('buildApiUrl', () => {
     expect(buildApiUrl('/api/anilist', 'https://w.example.dev/')).toBe('https://w.example.dev/api/anilist');
   });
 });
+
+import { directApiUrl, DIRECT_BASES } from './search.js';
+
+describe('directApiUrl', () => {
+  it('routes a direct-connect source to its official domain', () => {
+    expect(directApiUrl('bangumi', '/v0/search/subjects')).toBe('https://api.bgm.tv/v0/search/subjects');
+  });
+
+  it('routes moegirl to its official domain', () => {
+    expect(directApiUrl('moegirl', '/api.php?x=1')).toBe('https://zh.moegirl.org.cn/api.php?x=1');
+  });
+
+  it('exposes only bangumi and moegirl as direct sources', () => {
+    expect(Object.keys(DIRECT_BASES).sort()).toEqual(['bangumi', 'moegirl']);
+  });
+});

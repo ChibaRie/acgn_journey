@@ -3,6 +3,7 @@ import {
   BarChart3,
   Clock3,
   Download,
+  Image as ImageIcon,
   Library,
   Moon,
   Network,
@@ -23,8 +24,10 @@ import RelationGraphPanel from './components/RelationGraphPanel.jsx';
 import BulkImportPanel from './components/BulkImportPanel.jsx';
 import RecordEditor from './components/RecordEditor.jsx';
 import { useLibrary } from './hooks/useLibrary.js';
+import { useBackground } from './hooks/useBackground.js';
 import { getStats } from './utils/stats.js';
 import { createBackup, getDoneLabel, readBackup } from './utils/library.js';
+import { readImageFile } from './utils/background.js';
 
 const THEME_KEY = 'my-acgn-journey:theme';
 
@@ -51,8 +54,10 @@ export default function App() {
   const [theme, setTheme] = useState(getInitialTheme);
   const [toast, setToast] = useState('');
   const fileInputRef = useRef(null);
+  const bgInputRef = useRef(null);
   const { records, addWork, updateRecord, deleteRecord, replaceRecords, mergeRecords, hasWork } =
     useLibrary();
+  const { background, setImage, setOpacity, setBlur, clearImage } = useBackground();
   const stats = useMemo(() => getStats(records), [records]);
   const isDark = theme === 'dark';
 
@@ -136,8 +141,38 @@ export default function App() {
     }
   };
 
+  const handleImportBackground = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const dataUrl = await readImageFile(file);
+      setImage(dataUrl);
+      showToast('已应用自定义背景');
+    } catch (error) {
+      showToast(error.message || '背景图片导入失败');
+    }
+  };
+
+  const handleClearBackground = () => {
+    clearImage();
+    showToast('已恢复默认背景');
+  };
+
   return (
     <div className="app-shell">
+      {background.image && (
+        <div
+          className="app-background"
+          aria-hidden="true"
+          style={{
+            backgroundImage: `url(${background.image})`,
+            opacity: background.opacity,
+            filter: background.blur ? `blur(${background.blur}px)` : 'none',
+          }}
+        />
+      )}
       <header className="topbar">
         <div className="brand">
           <img className="brand-mark" src="/img.ico" alt="" aria-hidden="true" />
@@ -237,9 +272,71 @@ export default function App() {
             </div>
             <div>
               <dt>搜索来源</dt>
-              <dd>开发环境通过 Vite 代理访问 Bangumi、Bilibili 与萌娘百科。</dd>
+              <dd>直连 Bangumi、萌娘百科；AniList、VNDB、月幕Galgame 经代理访问。</dd>
             </div>
           </dl>
+
+          <div className="settings-section">
+            <div className="settings-section-head">
+              <p className="settings-section-title">自定义背景</p>
+              <span className="settings-section-hint">图片仅保存在本机浏览器</span>
+            </div>
+            <div className="settings-actions">
+              <button
+                className="button primary"
+                type="button"
+                onClick={() => bgInputRef.current?.click()}
+              >
+                <ImageIcon size={16} />
+                <span>导入图片</span>
+              </button>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={handleClearBackground}
+                disabled={!background.image}
+              >
+                <X size={16} />
+                <span>恢复默认</span>
+              </button>
+              <input
+                ref={bgInputRef}
+                className="sr-only"
+                type="file"
+                accept="image/*"
+                onChange={handleImportBackground}
+              />
+            </div>
+            <label className="settings-slider">
+              <span>
+                不透明度<em>{Math.round(background.opacity * 100)}%</em>
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={background.opacity}
+                disabled={!background.image}
+                onChange={(event) => setOpacity(Number(event.target.value))}
+              />
+            </label>
+            <label className="settings-slider">
+              <span>
+                模糊<em>{background.blur}px</em>
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="30"
+                step="1"
+                value={background.blur}
+                disabled={!background.image}
+                onChange={(event) => setBlur(Number(event.target.value))}
+              />
+            </label>
+          </div>
+
           <div className="settings-actions">
             <button className="button primary" type="button" onClick={handleExportBackup}>
               <Download size={16} />

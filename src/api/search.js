@@ -15,7 +15,6 @@ export function directApiUrl(source, path) {
 
 const SOURCE_LABELS = {
   bangumi: 'Bangumi',
-  bilibili: 'Bilibili',
   moegirl: '萌娘百科',
   anilist_anime: 'AniList动画',
   anilist_manga: 'AniList漫画',
@@ -149,53 +148,6 @@ async function searchBangumi(keyword, signal) {
   });
 
   return (json.data || []).map(normalizeBangumiItem);
-}
-
-function normalizeBilibiliItem(item) {
-  const title = stripHtml(item.title || item.org_title || '未命名番剧');
-  const releaseDate = item.pubtime || item.pubtime_show || item.index_show || '';
-  const tags = uniqueTags([
-    item.season_type_name,
-    item.areas,
-    Array.isArray(item.styles) ? item.styles : String(item.styles || '').split(/[ ,/]+/),
-  ]);
-
-  return {
-    id: `bilibili-${item.media_id || item.season_id || title}`,
-    source: 'bilibili',
-    sourceLabel: SOURCE_LABELS.bilibili,
-    sourceId: String(item.media_id || item.season_id || title),
-    sourceUrl: normalizeUrl(item.goto_url || item.url || ''),
-    title,
-    originalTitle: stripHtml(item.org_title || ''),
-    cover: normalizeUrl(item.cover || ''),
-    type: item.season_type_name || '动画',
-    summary: stripHtml(item.desc || item.cv || item.staff || ''),
-    releaseDate,
-    releaseYear: getYear(releaseDate),
-    tags,
-    meta: uniqueTags([releaseDate, ...tags], 3),
-  };
-}
-
-async function searchBilibili(keyword, signal) {
-  const params = new URLSearchParams({
-    search_type: 'media_bangumi',
-    keyword,
-    page: '1',
-  });
-  const json = await fetchJson(buildApiUrl(`/api/bilibili/x/web-interface/search/type?${params}`), {
-    signal,
-    headers: {
-      Accept: 'application/json,text/plain,*/*',
-    },
-  });
-
-  if (json.code !== 0) {
-    throw new Error(json.message || `Bilibili 返回 code ${json.code}`);
-  }
-
-  return (json.data?.result || []).map(normalizeBilibiliItem);
 }
 
 function normalizeMoegirlItem(page) {
@@ -397,7 +349,6 @@ async function searchYmgal(keyword, signal) {
 
 const PROVIDERS = {
   bangumi: searchBangumi,
-  bilibili: searchBilibili,
   moegirl: searchMoegirl,
   anilist_anime: searchAniListAnime,
   anilist_manga: searchAniListManga,

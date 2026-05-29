@@ -24,17 +24,6 @@ export default defineConfig({
         },
         rewrite: (path) => path.replace(/^\/api\/bangumi/, ''),
       },
-      '/api/bilibili': {
-        target: 'https://api.bilibili.com',
-        changeOrigin: true,
-        secure: true,
-        headers: {
-          ...browserLikeHeaders,
-          Referer: 'https://www.bilibili.com/',
-          Origin: 'https://www.bilibili.com',
-        },
-        rewrite: (path) => path.replace(/^\/api\/bilibili/, ''),
-      },
       '/api/moegirl': {
         target: 'https://zh.moegirl.org.cn',
         changeOrigin: true,

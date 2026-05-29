@@ -3,10 +3,6 @@ export const ROUTES = {
     target: 'https://api.bgm.tv',
     headers: { 'User-Agent': 'MyACGNJourney/0.3 (https://github.com/ChibaRie/My_ACGN_Journey)' },
   },
-  '/api/bilibili': {
-    target: 'https://api.bilibili.com',
-    headers: { Referer: 'https://www.bilibili.com/', Origin: 'https://www.bilibili.com' },
-  },
   '/api/moegirl': { target: 'https://zh.moegirl.org.cn', headers: {} },
   '/api/anilist': { target: 'https://graphql.anilist.co', headers: {} },
   '/api/vndb': { target: 'https://api.vndb.org/kana', headers: {} },

@@ -3,9 +3,9 @@ import { matchRoute, rewritePath, corsHeaders, shouldRefreshToken } from './rout
 
 describe('matchRoute', () => {
   it('matches a known prefix to its target + headers', () => {
-    const r = matchRoute('/api/bilibili/x/web-interface/search/type');
-    expect(r.target).toBe('https://api.bilibili.com');
-    expect(r.headers.Referer).toBe('https://www.bilibili.com/');
+    const r = matchRoute('/api/bangumi/v0/search/subjects');
+    expect(r.target).toBe('https://api.bgm.tv');
+    expect(r.headers['User-Agent']).toContain('MyACGNJourney');
   });
 
   it('matches vndb prefix', () => {

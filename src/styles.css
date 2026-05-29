@@ -102,6 +102,16 @@ a {
   min-height: 100dvh;
 }
 
+.app-background {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -1392,6 +1402,59 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 16px;
+}
+
+.settings-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-section-title {
+  margin: 0;
+  font-weight: 800;
+}
+
+.settings-section-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.settings-slider {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.settings-slider span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.settings-slider em {
+  color: var(--text);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.settings-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.settings-slider input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .toast {

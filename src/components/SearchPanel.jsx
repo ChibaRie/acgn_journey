@@ -5,7 +5,7 @@ import WorkCard from './WorkCard.jsx';
 import EmptyState from './EmptyState.jsx';
 
 const DEFAULT_SOURCES = ['bangumi', 'moegirl', 'anilist_anime', 'anilist_manga', 'vndb', 'ymgal'];
-const DIRECT_SOURCES = new Set(['bangumi', 'moegirl']);
+const DIRECT_SOURCES = new Set(['moegirl']);
 
 export default function SearchPanel({ hasWork, onAddWork }) {
   const [keyword, setKeyword] = useState('');

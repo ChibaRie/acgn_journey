@@ -9,5 +9,8 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 vite-dev*.log
+local-data-server.log
+desktop-launch.log
 .dev-server.pid
+.local-data-server.pid
 verification-*.png

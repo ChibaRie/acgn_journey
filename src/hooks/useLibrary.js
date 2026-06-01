@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { loadLocalRecords, saveLocalRecords } from '../utils/localApi.js';
 import {
   createRecordFromWork,
   getWorkKey,
@@ -8,11 +9,63 @@ import {
 } from '../utils/library.js';
 
 export function useLibrary() {
+  const [storage, setStorage] = useState({
+    mode: 'checking',
+    type: 'browser',
+    path: '',
+    error: '',
+  });
   const [records, setRecords] = useState(() => loadRecords().map(normalizeRecord));
 
   useEffect(() => {
+    let cancelled = false;
+    loadLocalRecords()
+      .then((payload) => {
+        if (cancelled) return;
+        setRecords((current) => {
+          const localRecords = (payload.records || []).map(normalizeRecord);
+          if (localRecords.length === 0 && current.length > 0) {
+            saveLocalRecords(current).catch(() => {});
+            return current;
+          }
+          return localRecords;
+        });
+        setStorage({
+          mode: 'local',
+          type: payload.storage?.type || 'sqlite',
+          path: payload.storage?.path || '',
+          error: '',
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setStorage({
+          mode: 'browser',
+          type: 'localStorage',
+          path: '',
+          error: error.message || '本地数据服务不可用',
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (storage.mode === 'checking') return;
     saveRecords(records);
-  }, [records]);
+    if (storage.mode === 'local') {
+      saveLocalRecords(records).catch((error) => {
+        setStorage((current) => ({
+          ...current,
+          mode: 'browser',
+          type: 'localStorage',
+          path: '',
+          error: error.message || '本地数据服务保存失败，已回退到浏览器存储',
+        }));
+      });
+    }
+  }, [records, storage.mode]);
 
   const workKeys = useMemo(() => new Set(records.map((record) => record.workKey)), [records]);
 
@@ -86,5 +139,6 @@ export function useLibrary() {
     replaceRecords,
     mergeRecords,
     hasWork,
+    storage,
   };
 }

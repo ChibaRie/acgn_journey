@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 const browserLikeHeaders = {
   'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) acgn_journey/0.5.4 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) acgn_journey/0.7.0 Safari/537.36',
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
 };
 
@@ -20,7 +20,7 @@ export default defineConfig({
         secure: true,
         headers: {
           ...browserLikeHeaders,
-          'User-Agent': 'acgn_journey/0.5.4 (local Vite proxy; https://bangumi.github.io/api/)',
+          'User-Agent': 'acgn_journey/0.7.0 (local Vite proxy; https://bangumi.github.io/api/)',
         },
         rewrite: (path) => path.replace(/^\/api\/bangumi/, ''),
       },
@@ -30,7 +30,7 @@ export default defineConfig({
         secure: true,
         headers: {
           ...browserLikeHeaders,
-          'User-Agent': 'acgn_journey/0.5.4 (local Vite proxy; https://bangumi.github.io/api/)',
+          'User-Agent': 'acgn_journey/0.7.0 (local Vite proxy; https://bangumi.github.io/api/)',
         },
         rewrite: (path) => path.replace(/^\/api\/sources\/bangumi/, ''),
       },

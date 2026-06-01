@@ -24,7 +24,7 @@ export default {
     headers.delete('referer');
     headers.set(
       'User-Agent',
-      'Mozilla/5.0 (compatible; acgn_journey/0.5.4; +https://github.com/ChibaRie/acgn_journey)',
+      'Mozilla/5.0 (compatible; acgn_journey/0.7.0; +https://github.com/ChibaRie/acgn_journey)',
     );
     for (const [k, v] of Object.entries(route.headers)) headers.set(k, v);
 

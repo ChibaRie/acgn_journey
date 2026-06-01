@@ -29,6 +29,7 @@ import { useBackground } from './hooks/useBackground.js';
 import { getStats } from './utils/stats.js';
 import { createBackup, getDoneLabel, readBackup } from './utils/library.js';
 import { readImageFile } from './utils/background.js';
+import { loadLocalSetting, saveLocalSetting } from './utils/localApi.js';
 
 const THEME_KEY = 'acgn_journey:theme';
 const LEGACY_THEME_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:theme`];
@@ -56,6 +57,7 @@ export default function App() {
   const [editingRecord, setEditingRecord] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState(getInitialTheme);
+  const [themeStorageMode, setThemeStorageMode] = useState('checking');
   const [toast, setToast] = useState('');
   const fileInputRef = useRef(null);
   const bgInputRef = useRef(null);
@@ -69,16 +71,40 @@ export default function App() {
     replaceRecords,
     mergeRecords,
     hasWork,
+    storage,
   } = useLibrary();
   const { background, setImage, setOpacity, setBlur, clearImage } = useBackground();
   const stats = useMemo(() => getStats(records), [records]);
   const isDark = theme === 'dark';
 
   useEffect(() => {
+    let cancelled = false;
+    loadLocalSetting('theme')
+      .then((setting) => {
+        if (cancelled) return;
+        if (setting?.value === 'dark' || setting?.value === 'light') {
+          setTheme(setting.value);
+        }
+        setThemeStorageMode('local');
+      })
+      .catch(() => {
+        if (!cancelled) setThemeStorageMode('browser');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
     localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+    if (themeStorageMode === 'local') {
+      saveLocalSetting('theme', theme).catch(() => {
+        setThemeStorageMode('browser');
+      });
+    }
+  }, [theme, themeStorageMode]);
 
   const showToast = (message) => {
     setToast(message);
@@ -301,7 +327,11 @@ export default function App() {
           <dl className="settings-list">
             <div>
               <dt>记录数据</dt>
-              <dd>保存在当前浏览器的 LocalStorage，不会自动同步到云端。</dd>
+              <dd>
+                {storage.mode === 'local'
+                  ? `保存在本机 SQLite 数据库：${storage.path || '本地数据目录'}，不会随浏览器清理丢失。`
+                  : '当前回退到浏览器 LocalStorage；若本机数据服务可用会优先写入 SQLite。'}
+              </dd>
             </div>
             <div>
               <dt>主题偏好</dt>
@@ -310,6 +340,14 @@ export default function App() {
             <div>
               <dt>搜索来源</dt>
               <dd>当前为墙内优先的单来源检索：AGE动漫、萌娘百科为直连，Bangumi 标注为需代理。</dd>
+            </div>
+            <div>
+              <dt>存储模式</dt>
+              <dd>
+                {storage.mode === 'local'
+                  ? `本机持久化已启用（${storage.type}）`
+                  : `本机持久化未连接，${storage.error || '使用浏览器回退存储'}`}
+              </dd>
             </div>
           </dl>
 

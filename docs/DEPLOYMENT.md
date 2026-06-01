@@ -1,18 +1,93 @@
-# 部署指南
+# 部署与运行指南
 
-本项目部署为 GitHub Pages 静态站。默认搜索源优先浏览器直连；Cloudflare Worker 只作为已验证来源的可选 fallback，默认搜索不依赖它。
+acgn_journey 现在有两个入口：
 
-## 一、可选部署 Cloudflare Worker（搜索代理）
+- **桌面正式使用**：Electron + 本机 SQLite，数据保存在用户设备中。
+- **在线演示**：GitHub Pages 静态站，只用于体验和展示；无法替用户启动本机进程。
 
-默认可直连来源不依赖 Worker，并按当前 UI 顺序排序：
+## 一、本地桌面模式
 
-- AGE动漫搜索页
-- 萌娘百科 MediaWiki API
-- trace.moe 截图识别 API
+推荐命令：
 
-Bangumi 在 UI 中标注为需代理；如果未配置 `VITE_API_BASE`，前端仍会尝试官方 API 直连 fallback。
+```powershell
+npm install
+npm run desktop:start
+```
 
-Worker 只转发以下仍保留的固定前缀，不接收任意目标 URL：
+启动后会运行三部分：
+
+| 部分 | 默认地址 | 说明 |
+|---|---|---|
+| Electron | 本地窗口 | 用户实际操作入口 |
+| 本机应用运行时 | `http://127.0.0.1:5188` | 提供 `dist` 中的生产构建文件 |
+| 本机数据服务 | `http://127.0.0.1:5198` | 读写 SQLite 数据库 |
+
+默认数据位置：
+
+- Windows：`%APPDATA%\acgn_journey\acgn_journey.sqlite`
+- macOS：`~/Library/Application Support/acgn_journey/acgn_journey.sqlite`
+- Linux：`$XDG_DATA_HOME/acgn_journey/acgn_journey.sqlite` 或 `~/.local/share/acgn_journey/acgn_journey.sqlite`
+
+可用环境变量：
+
+| 变量 | 作用 |
+|---|---|
+| `APP_HOST` | 前端运行时 host，默认 `127.0.0.1` |
+| `APP_PORT` | 前端运行时端口，默认 `5188` |
+| `DATA_HOST` | 本机数据服务 host，默认 `127.0.0.1` |
+| `DATA_PORT` | 本机数据服务端口，默认 `5198` |
+| `ACGN_DATA_DIR` | 覆盖 SQLite 数据目录 |
+| `ACGN_DB_PATH` | 覆盖 SQLite 数据库完整路径 |
+
+示例：
+
+```powershell
+$env:ACGN_DATA_DIR="D:\acgn_journey_data"
+npm run desktop:start
+```
+
+## 二、浏览器本地开发模式
+
+```powershell
+npm run app
+```
+
+常用命令：
+
+- `npm run app`：自动判断当前状态，未运行时启动，已运行时停止。
+- `npm run app:start`：启动本机 SQLite 数据服务与开发服务并打开浏览器。
+- `npm run app:stop`：停止当前项目的开发服务和本机数据服务。
+- `npm run app:restart`：重启本机 SQLite 数据服务和开发服务。
+- `npm run app:status`：查看运行状态。
+- `npm run dev`：只启动 Vite，适合需要前台日志时使用。
+
+## 三、GitHub Pages 在线演示
+
+线上地址：
+
+```text
+https://chibarie.github.io/acgn_journey/
+```
+
+GitHub Pages 只发布静态前端。它无法部署或启动 `scripts/local-data-server.mjs`，因此无法保证像桌面模式一样写入用户设备里的 SQLite。在线演示在本机数据服务不可用时会回退到浏览器 LocalStorage。
+
+发布步骤：
+
+1. 仓库 Settings -> Pages -> Build and deployment -> Source 选择 **GitHub Actions**。
+2. push 到 `main`，或在 Actions 页面手动运行 workflow。
+3. 部署完成后访问 `https://chibarie.github.io/acgn_journey/`。
+
+## 四、搜索代理与 Worker
+
+默认搜索优先使用可直连来源：
+
+- AGE动漫搜索页：`https://www.agedm.io/search?query=...`
+- 萌娘百科 MediaWiki API：`https://zh.moegirl.org.cn/api.php?origin=*`
+- trace.moe 截图识别 API：`https://api.trace.moe/search?anilistInfo`
+
+Bangumi 在 UI 中标注为需代理；未配置 `VITE_API_BASE` 时，前端仍会尝试官方 API 直连 fallback。
+
+Cloudflare Worker 目前只作为可选 fallback，保留固定白名单路由：
 
 | 前端路径 | 上游 |
 |---|---|
@@ -21,50 +96,33 @@ Worker 只转发以下仍保留的固定前缀，不接收任意目标 URL：
 | `/api/age/*` | `https://www.agedm.io/*` |
 | `/api/sources/age/*` | `https://www.agedm.io/*` |
 
-咕咕番、girigiri愛、豆瓣、NyaFun 已从 active code 和代理白名单中移除；重新接入前需先验证墙内可用性、CORS/代理策略和解析稳定性。
+部署 Worker：
 
-1. 安装 wrangler 并登录（需免费 Cloudflare 账号）：
+```bash
+npm install -g wrangler
+wrangler login
+cd worker
+wrangler deploy
+```
 
-   ```bash
-   npm install -g wrangler
-   wrangler login
-   ```
+如未来启用 Worker fallback，可在 GitHub Actions 变量中配置：
 
-2. 部署：
+- Name：`VITE_API_BASE`
+- Value：Worker URL，不带末尾斜杠
 
-   ```bash
-   cd worker
-   wrangler deploy
-   ```
+## 五、验证
 
-3. 记下输出的 Worker URL，形如 `https://acgn-proxy.<你的子域>.workers.dev`。
+推荐发布或提交前执行：
 
-4. 允许来源默认是 `https://chibarie.github.io`。换 Pages 域名时改 `worker/wrangler.toml` 的 `ALLOWED_ORIGIN` 后重新 `wrangler deploy`。
+```powershell
+npm test
+npm run build
+npm run app:status
+```
 
-## 二、配置并触发 GitHub Pages
+桌面入口可用下面命令做语法检查：
 
-1. 仓库 Settings → Pages → Build and deployment → Source 选 **GitHub Actions**。
-
-2. 不需要配置 `VITE_API_BASE` 也可以正常发布。默认搜索源会直接请求上游。
-
-3. 如果未来启用 Worker fallback，再到仓库 Settings → Secrets and variables → Actions → **Variables** 标签 → New repository variable：
-   - Name: `VITE_API_BASE`
-   - Value: Worker URL（不带末尾斜杠）
-
-4. push 到 `main`（或在 Actions 页手动 Run workflow）触发部署。
-
-5. 部署完成后访问 `https://chibarie.github.io/acgn_journey/`。
-
-## 工作原理
-
-- 搜索 UI 是单来源模式：用户先选择 AGE动漫、萌娘百科或 Bangumi，再搜索关键词。
-- “截图识别”面板直接调用 trace.moe，可上传本地截图或粘贴图片 URL。
-- `src/search/adapters/*` 负责按来源构造请求、解析 HTML/JSON，并归一化为 `SearchWork`。
-- Bangumi 代理优先使用当前线上 Worker 已部署的 `/api/bangumi/*`，Worker 代码也兼容新前缀 `/api/sources/bangumi/*`。
-- **本地开发**：默认来源直接请求上游；保留的代理 fallback 可由 Vite dev server 转发（见 `vite.config.js`）。
-- **生产**：默认来源直接请求上游；若未来启用代理 fallback，构建时注入 `VITE_API_BASE`，请求改打 Cloudflare Worker，由 Worker 转发到固定上游并回填 CORS 头。
-- Worker 路由表（`worker/router.js`）与 Vite 代理表结构一致，是白名单封闭代理；其它路径返回 404。
-
-## 本地开发
-
-本地默认使用 `npm run app` 统一启停开发服务；需要前台查看 Vite 日志时也可以直接运行 `npm run dev`。本地开发不需要 Worker。只有验证生产代理本身时才需要 `cd worker && wrangler dev` 或重新部署 Worker。
+```powershell
+node --check scripts/desktop.mjs
+node --check electron/main.mjs
+```

@@ -1,6 +1,6 @@
 {
   "name": "acgn_journey",
-  "version": "0.5.4",
+  "version": "0.7.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -12,6 +12,7 @@
     "app:restart": "node scripts/dev-server.mjs restart",
     "app:status": "node scripts/dev-server.mjs status",
     "app:help": "node scripts/dev-server.mjs help",
+    "desktop:start": "node scripts/desktop.mjs",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4174",
     "test": "vitest run"
@@ -23,6 +24,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.1",
+    "electron": "^38.1.0",
     "vite": "^7.2.6",
     "vitest": "^4.1.7"
   }

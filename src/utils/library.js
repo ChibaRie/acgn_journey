@@ -1,6 +1,6 @@
 export const STORAGE_KEY = 'acgn_journey:records:v1';
 const LEGACY_STORAGE_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:records:v1`];
-export const BACKUP_VERSION = '0.5.4';
+export const BACKUP_VERSION = '0.7.0';
 
 export const STATUS_OPTIONS = [
   { value: 'wish', defaultLabel: '想看', anime: '想看', book: '想读', game: '想玩' },

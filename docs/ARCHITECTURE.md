@@ -1,69 +1,90 @@
-# acgn_journey — 系统架构设计文档
+# acgn_journey 系统架构设计文档
 
 ## 1. 项目概述
 
-acgn_journey 是一个个人ACG（动画、轻小说、Galgame）作品记录管理单页应用。用户可按单来源检索作品信息、将作品加入个人库、追踪观看/阅读/游玩进度、记录评分短评、管理实体藏品，并通过时间线和统计面板回顾个人历程。
+acgn_journey 是一个个人 ACGN 作品记录管理软件。用户可以搜索作品、加入个人库、管理观看/阅读/游玩状态、记录评分短评、维护实体库存，并通过时间线和统计面板回顾自己的 ACGN 历程。
 
-## 2. 技术选型与架构决策
+v0.7 的核心定位是本地桌面软件：Electron 提供窗口入口，本机静态运行时提供 React/Vite 的生产构建文件，Node 本机数据服务负责把数据写入用户设备中的 SQLite 数据库。GitHub Pages 保留为在线演示入口。
+
+## 2. 技术选型
 
 | 层面 | 选择 | 理由 |
 |------|------|------|
-| 前端框架 | React 19 + Vite 7 | 快速 HMR、原生 ESM、轻量 |
-| 样式方案 | 原生 CSS (CSS Variables) | 零依赖、主题切换简单、体积小 |
-| 状态管理 | useLibrary Hook + LocalStorage | 单页应用无需复杂状态库，自动持久化 |
-| 路由 | Tab 状态切换 | 应用面板少、无需深层路由 |
-| 图标 | Lucide React | 轻量、Tree-shakable、风格统一 |
-| 搜索集成 | 直连优先的单来源 adapter + 可选白名单代理 | 参考 anime_trace 的单站点检索模型，同时降低线上代理部署依赖 |
-| 数据持久化 | LocalStorage | 即刻可用、备份/恢复简单 |
-| 图表 | 自定义 CSS Bar | 避免引入图表库，设计一致 |
+| 桌面壳 | Electron | 快速把现有 Web 应用落地为本地软件 |
+| 前端框架 | React 19 + Vite 7 | 快速 HMR、原生 ESM、维护成本低 |
+| 样式方案 | 原生 CSS + CSS Variables | 主题切换简单，依赖少 |
+| 状态管理 | React Hooks | 当前业务规模下足够清晰 |
+| 数据持久化 | Node 本机服务 + SQLite | 数据保存在用户设备，不依赖浏览器缓存 |
+| 图标 | Lucide React | 轻量、风格统一 |
+| 搜索集成 | 单来源 adapter + 可选代理 fallback | 更接近 anime_trace 的单站点检索模型 |
+| 测试 | Vitest | 覆盖搜索归一化、导入与路由逻辑 |
 
-**关键设计决策：**
-- 采用原生 CSS Variables 实现暗夜/日间双主题，通过 `data-theme` 属性切换
-- 搜索请求通过 `src/search/` 的来源 adapter 归一化；默认来源直接请求支持 CORS 的上游，废弃或不可稳定直连的来源先从 active code 中移除
-- 所有数据存储在 LocalStorage 单键下，导出为 JSON 备份文件
-- 组件按面板（Panel）拆分，每个面板自包含状态和逻辑
+## 3. 运行时架构
 
-## 3. 数据模型
+```mermaid
+flowchart LR
+  U["用户"] --> E["Electron 桌面窗口"]
+  E --> F["React 生产构建<br/>127.0.0.1:5188"]
+  F --> D["本机数据服务<br/>127.0.0.1:5198"]
+  D --> S["SQLite 数据库<br/>用户设备目录"]
+  F --> L["LocalStorage fallback"]
+  F --> A["搜索来源<br/>AGE / 萌娘百科 / Bangumi / trace.moe"]
+```
 
-### 3.1 核心实体：LibraryRecord（库记录）
+桌面模式启动链路：
+
+1. 用户运行 `npm run desktop:start`。
+2. `scripts/desktop.mjs` 检查依赖、本机数据服务和前端运行时。
+3. 若服务未运行，启动 `scripts/local-data-server.mjs` 和本机静态应用运行时。
+4. 启动 Electron，并加载本机前端地址。
+5. 用户关闭窗口后，启动器收掉自己创建的子进程。
+
+浏览器开发模式：
+
+1. 用户运行 `npm run app` 或 `npm run app:start`。
+2. `scripts/dev-server.mjs` 启动本机数据服务和 Vite，并打开浏览器。
+3. `npm run app:stop` 可停止两者。
+
+在线演示模式：
+
+1. GitHub Pages 发布静态前端。
+2. 页面无法启动本机进程。
+3. 本机数据服务不可用时，前端自动回退到 LocalStorage。
+
+## 4. 数据模型
+
+### 4.1 LibraryRecord
 
 ```typescript
 interface LibraryRecord {
-  // 标识
-  id: string;              // UUID v4
-  workKey: string;         // 去重键: "{source}:{sourceId}"
-
-  // 来源追踪
-  source: string;          // 'bangumi' | 'moegirl' | 'age' | 'manual' 等
-  sourceId: string;        // 数据源ID
-  sourceUrl: string;       // 原始页面链接
-
-  // 作品信息
-  title: string;           // 作品标题（中文优先）
-  originalTitle: string;   // 原标题/日文名
-  cover: string;           // 封面图片URL
-  type: string;            // 作品类型（动画、轻小说/书籍、Galgame/游戏、漫画等）
-  summary: string;         // 作品简介
-  releaseDate: string;     // 发售/播出日期
-  releaseYear: string;     // 作品年份
-
-  // 用户状态
+  id: string;
+  workKey: string;
+  source: string;
+  sourceId: string;
+  sourceUrl: string;
+  title: string;
+  originalTitle: string;
+  cover: string;
+  type: string;
+  summary: string;
+  releaseDate: string;
+  releaseYear: string;
   status: 'wish' | 'active' | 'done' | 'paused' | 'dropped';
-  rating: number;          // 0-10 整数评分
-  comment: string;         // 短评
-  tags: string[];          // 用户标签
-  animeTags: string[];     // 来源解析出的动漫标签，供词云/标签统计使用
-
-  // 时间追踪
-  startedAt: string;       // 开始日期 (YYYY-MM-DD)
-  finishedAt: string;      // 完成日期 (YYYY-MM-DD)
-  addedAt: string;         // 加入库时间 (ISO 8601)
-  updatedAt: string;       // 最后修改时间 (ISO 8601)
-
-  // 扩展模块
-  inventory: Inventory;    // 实体藏品信息
+  rating: number;
+  comment: string;
+  tags: string[];
+  animeTags: string[];
+  startedAt: string;
+  finishedAt: string;
+  addedAt: string;
+  updatedAt: string;
+  inventory: Inventory;
 }
+```
 
+### 4.2 Inventory
+
+```typescript
 interface Inventory {
   owned: boolean;
   format: 'light-novel' | 'bd' | 'game-disc' | 'game-card' | 'goods' | 'other';
@@ -75,16 +96,15 @@ interface Inventory {
   purchasedAt: string;
   notes: string;
 }
-
 ```
 
-### 3.2 搜索临时实体：SearchWork
+### 4.3 SearchWork
 
 ```typescript
 interface SearchWork {
-  id: string;              // "{source}-{sourceId}"
+  id: string;
   source: string;
-  sourceLabel: string;     // "Bangumi" | "萌娘百科" | "AGE动漫" | ...
+  sourceLabel: string;
   sourceId: string;
   sourceUrl: string;
   title: string;
@@ -95,244 +115,121 @@ interface SearchWork {
   releaseDate: string;
   releaseYear: string;
   tags: string[];
-  meta: string[];          // 附加元数据（评分/排名等）
+  animeTags?: string[];
+  meta: string[];
 }
 ```
 
-### 3.3 状态流转
+## 5. 数据持久化
 
-```
-wish (想看) → active (在看) → done (已看)
-    ↓            ↓               ↓
-  dropped      paused ←──────────┘
-  (抛弃)       (搁置)
-```
+本机数据服务 API：
 
-状态标签根据作品类型自动适配文言：
-- 动画: 想看/在看/已看
-- 书籍/轻小说: 想读/在读/已读
-- 游戏/Galgame: 想玩/在玩/已玩
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/local/health` | 健康检查，返回数据库路径和记录数 |
+| `GET` | `/api/local/records` | 读取作品库 |
+| `PUT` | `/api/local/records` | 覆盖写入作品库 |
+| `GET` | `/api/local/settings/:key` | 读取设置 |
+| `PUT` | `/api/local/settings/:key` | 写入设置 |
+| `DELETE` | `/api/local/settings/:key` | 删除设置 |
 
-## 4. 系统架构
+前端策略：
 
-### 4.1 组件树
+- `useLibrary` 先从浏览器缓存快速初始化，再尝试读取 SQLite。
+- SQLite 有数据时以 SQLite 为准。
+- SQLite 为空但浏览器已有记录时，会迁移当前记录到 SQLite。
+- 后续变更优先保存到 SQLite，同时保留浏览器 fallback。
+- 背景与主题偏好同样优先写入本机设置表。
 
-```
-App (状态根)
-├── Topbar
-│   ├── Brand (标题 + 统计概览)
-│   ├── TabBar (7个标签页切换)
-│   └── TopbarMeta (总览数字)
-├── Workspace (主内容区)
-│   ├── SearchPanel
-│   │   ├── SearchForm (关键词输入)
-│   │   ├── SourceSelector (来源选择: AGE动漫/萌娘百科/Bangumi)
-│   │   ├── WarningStrip (API错误提示)
-│   │   ├── EmptyState (无结果)
-│   │   └── ResultGrid
-│   │       └── WorkCard[] (搜索结果卡片)
-│   ├── TraceMoePanel (截图识别)
-│   ├── LibraryPanel
-│   │   ├── CategoryRow (分类筛选chip)
-│   │   ├── YearCategoryRow (作品年份筛选chip)
-│   │   ├── FilterRow (关键词+状态筛选)
-│   │   ├── BulkToolbar (批量选择/状态修改/删除)
-│   │   ├── EmptyState
-│   │   └── LibraryList
-│   │       └── LibraryItem[] (库记录列表，支持批量勾选)
-│   ├── InventoryPanel (实体库存)
-│   ├── BulkImportPanel (批量导入)
-│   ├── TimelinePanel (时间线)
-│   └── StatsPanel (统计面板 + 标签词云)
-├── Footer (GitHub 仓库链接)
-├── RecordEditor (编辑弹窗，模态)
-├── SettingsPopover (设置面板)
-├── FloatingToolbar (右下角主题/设置按钮)
-└── Toast (操作提示)
+## 6. 搜索架构
+
+`src/search/` 负责搜索来源适配：
+
+```text
+src/search/
+  sources.js
+  searchService.js
+  html.js
+  adapters/
+    age.js
+    bangumi.js
+    moegirl.js
+    traceMoe.js
 ```
 
-### 4.2 数据流
+策略：
 
-```
-                    ┌──────────────┐
-                    │  LocalStorage │
-                    │  (持久化层)    │
-                    └──────┬───────┘
-                           │ loadRecords() / saveRecords()
-                    ┌──────▼───────┐
-                    │  useLibrary  │
-                    │  (状态管理)   │
-                    │  - records   │
-                    │  - addWork   │
-                    │  - update    │
-                    │  - delete    │
-                    │  - hasWork   │
-                    └──────┬───────┘
-                           │ props/context
-              ┌────────────┼────────────┐
-              │            │            │
-        SearchPanel  LibraryPanel  TimelinePanel
-              │            │            │
-          searchSource   filterRecords  getStats
-              │            │            │
-       Source adapter
-              │
-      browser-readable
-        upstream API/page
+- UI 只维护一个当前来源。
+- `searchSource(sourceId, keyword)` 调度对应 adapter。
+- adapter 负责请求、解析 HTML/JSON，并归一化为 `SearchWork`。
+- 当前来源失败时只显示当前来源错误，不再混合多个来源的失败信息。
+- trace.moe 截图识别独立于文字搜索来源。
+
+## 7. 主要组件
+
+```text
+App
+  Topbar
+  SearchPanel
+  TraceMoePanel
+  LibraryPanel
+  InventoryPanel
+  BulkImportPanel
+  TimelinePanel
+  StatsPanel
+  RecordEditor
+  SettingsPopover
+  FloatingToolbar
 ```
 
-### 4.3 API 集成架构
+关键 Hook：
 
-默认文字搜索源按 AGE动漫、萌娘百科、Bangumi 排序。AGE动漫和萌娘百科标注为直连；Bangumi 在 UI 中标注为需代理，但代码保留官方 API 直连 fallback，避免未配置 Worker 的环境彻底不可用；配置 `VITE_API_BASE` 时优先使用当前线上 Worker 已部署的 `/api/bangumi/*`。当前不保留“先藏起来以后再说”的候选源；无法稳定直连或需要额外反爬适配的来源会先从 UI、adapter、测试和代理白名单中删除。
+- `useLibrary`：作品库状态、SQLite 同步、批量更新与删除。
+- `useBackground`：背景图片、透明度、模糊度与本机设置同步。
 
-```
-浏览器 fetch('https://www.agedm.io/search?query=...')
-    → AGE动漫搜索页
-    → 返回带 Access-Control-Allow-Origin 的 HTML
-    → adapter 解析为 SearchWork
-```
+关键工具：
 
-**默认直连来源：**
-
-| 来源 | 上游 | 数据格式 |
-|------|------|------|
-| AGE动漫 | `https://www.agedm.io/search?query=...` | HTML |
-| 萌娘百科 | `https://zh.moegirl.org.cn/api.php?origin=*` | JSON |
-| Bangumi | `https://api.bgm.tv` | JSON |
-| trace.moe | `https://api.trace.moe/search?anilistInfo` | JSON |
-
-**已舍弃来源：** 咕咕番、girigiri愛、豆瓣、NyaFun。它们分别存在无 CORS、接口限制、跳转校验或解析稳定性问题，重新接入前必须先完成墙内可用性验证。
-
-**搜索策略：**
-1. UI 只维护一个 `sourceId`，切换来源不会自动发请求
-2. `searchSource(sourceId, keyword)` 校验来源并调度对应 adapter
-3. Adapter 负责拼 URL、请求、解析 HTML/JSON，并转换为统一的 `SearchWork`
-4. 当前来源失败时只显示该来源错误，不再展示多来源错误列表
-5. Bangumi 代理路径优先使用线上已部署的 `/api/bangumi/*`，Worker 代码保留 `/api/sources/bangumi/*` 兼容路由
-
-**截图识别策略：**
-1. `TraceMoePanel` 独立于文字搜索源，支持图片 URL 和本地文件上传
-2. `searchTraceMoe()` 调用 trace.moe `/search?anilistInfo`，默认加 `cutBorders`
-3. 返回结果按 AniList 信息、集数、时间点和相似度归一化为 `SearchWork`
-4. 用户可将识别结果直接加入本地作品库
-
-## 5. 关键模块设计
-
-### 5.1 搜索模块 (`src/search/`)
-
-- `sources.js`: 默认直连来源注册表与可选代理 fallback 路径构造
-- `searchService.js`: `searchSource(sourceId, keyword, options)` 单来源入口
-- `html.js`: HTML/BBCode 清洗、URL 修补、年份与标签工具
-- `adapters/*.js`: 每个来源一个 adapter，负责请求和归一化；`traceMoe.js` 负责截图识别
-- 支持 AbortController 取消请求
-
-`src/api/search.js` 仅作为兼容导出层，转发 `src/search/` 的新接口。
-
-### 5.2 状态管理 (`hooks/useLibrary.js`)
-
-- `records` state 初始化自 LocalStorage
-- 通过 `useEffect` 自动同步到 LocalStorage
-- `hasWork(work)`: 通过 `workKey` 集合快速判断是否已入库
-- `addWork(work)`: 从 SearchWork 创建新 record，默认状态为 'done'，并保留来源侧 `animeTags`
-- `updateRecord(id, patch)`: 部分更新，自动记录 updatedAt
-- `deleteRecord(id)`: 删除对应记录
-- `bulkUpdateRecords(ids, patch)`: 对选中记录执行批量字段更新
-- `deleteRecords(ids)`: 删除一组选中记录
-- `replaceRecords()` / `mergeRecords()`: 导入场景
-
-### 5.3 统计模块 (`utils/stats.js`)
-
-- `getStats(records)`: 计算总览（总数、完成数、均分）、标签词云数据和分布（类型/状态/年份/评分）
-- `filterRecords(records, filters)`: 多条件筛选，支持 title/type/status/year/category/workYear
-- `scripts/tag_wordcloud.py`: 可读取导出的 JSON 备份，使用 `pyecharts` 生成独立交互词云 HTML；未安装依赖时生成静态 fallback
-
-### 5.4 导入模块 (`utils/importers.js`)
-
-- 支持格式: CSV（自动检测表头）、MyAnimeList XML
-- 来源自动识别（通过文件名）
-- 字段别名映射表（中英文双语表头兼容）
-- 状态/评分/日期/类型智能解析和规范化
-
-## 6. 主题系统
-
-使用 CSS Variables 实现双主题：
-
-```
-:root                         → 日间主题
-:root[data-theme="dark"]      → 暗夜主题
-```
-
-主题切换通过 `document.documentElement.dataset.theme` 设置，偏好保存在 LocalStorage。
-首次加载通过 `prefers-color-scheme` 媒体查询自动选择。
-
-## 7. 安全与性能
-
-- 封面图片使用 `referrerPolicy="no-referrer"` 保护隐私
-- 搜索请求支持 AbortController 取消
-- 备份文件包含版本号防止格式不兼容
-- `prefers-reduced-motion` 媒体查询支持
-- 所有外部链接使用 `rel="noreferrer"`
-- Touch target 最小 44x44px
+- `src/utils/library.js`：记录归一化、备份导入导出、状态/分类工具。
+- `src/utils/localApi.js`：本机数据服务客户端。
+- `src/utils/stats.js`：统计与筛选。
+- `src/utils/importers.js`：CSV/XML 导入。
 
 ## 8. 文件结构
 
-```
+```text
 acgn_journey/
-├── index.html              # 入口 HTML
-├── package.json            # 依赖说明
-├── vite.config.js          # Vite 配置 + API 代理
-├── README.md               # 项目说明
-├── LICENSE                 # MIT License
-├── scripts/
-│   └── dev-server.mjs      # 统一启停命令工具
-├── docs/
-│   └── ARCHITECTURE.md     # 本文件
-└── src/
-    ├── main.jsx            # React 渲染入口
-    ├── App.jsx             # 根组件（标签路由、状态协调）
-    ├── styles.css          # 全局样式 + 主题变量
-    ├── api/
-    │   └── search.js       # 搜索兼容导出层
-    ├── search/
-    │   ├── sources.js      # 单来源注册表
-    │   ├── searchService.js # 单来源搜索入口
-    │   ├── html.js         # HTML/URL/标签工具
-    │   └── adapters/       # AGE/萌娘百科/Bangumi/trace.moe adapters
-    ├── hooks/
-    │   └── useLibrary.js   # 作品库状态管理 Hook
-    ├── utils/
-    │   ├── library.js      # 数据模型、CRUD 工具、序列化
-    │   ├── stats.js        # 统计计算、筛选工具
-    │   └── importers.js    # CSV/XML 导入解析
-    └── components/
-        ├── SearchPanel.jsx     # 搜索面板
-        ├── WorkCard.jsx        # 搜索结果卡片
-        ├── LibraryPanel.jsx    # 作品库面板
-        ├── TimelinePanel.jsx   # 时间线面板
-        ├── StatsPanel.jsx      # 统计面板
-        ├── InventoryPanel.jsx  # 实体库存面板
-        ├── BulkImportPanel.jsx # 批量导入面板
-        ├── RecordEditor.jsx    # 记录编辑弹窗
-        └── EmptyState.jsx      # 空状态占位组件
+  electron/
+    main.mjs
+  scripts/
+    desktop.mjs
+    dev-server.mjs
+    local-data-server.mjs
+    tag_wordcloud.py
+  src/
+    App.jsx
+    main.jsx
+    components/
+    hooks/
+    search/
+    utils/
+  worker/
+  docs/
+  package.json
+  vite.config.js
 ```
 
-## 9. 后端扩展方案
+## 9. 安全与边界
 
-当前版本为纯前端 SPA，数据存储在 LocalStorage。如需升级为后端驱动版本，建议方案：
+- Electron 禁用 `nodeIntegration`，启用 `contextIsolation` 和 `sandbox`。
+- 本机数据服务默认只监听 `127.0.0.1`。
+- CORS 只允许 loopback 与已知线上来源。
+- 搜索代理只保留固定白名单前缀，不接收任意上游 URL。
+- 外部链接在 Electron 中通过系统浏览器打开。
+- 图片背景保存在本机设置中，不上传云端。
 
-### 9.1 最小迁移路径
-- 将 `loadRecords()` / `saveRecords()` 替换为 REST API 调用
-- 新增 Express/Koa 后端，提供 `/api/records` CRUD
-- 搜索代理从 Vite 迁移到后端，支持生产环境部署
-- 数据库选择：SQLite（轻量）或 PostgreSQL（扩展性）
+## 10. 后续方向
 
-### 9.2 API 同步增强
-- 通过 OAuth 接入 Bangumi / AniList / VNDB 等授权同步能力
-- 后端安全保存 access_token 和 refresh_token
-- 定时同步用户在各平台的记录
-- 冲突解决策略：本地优先、远端优先、合并
-
-### 9.3 多端同步
-- 引入用户认证（JWT 或 Session）
-- 数据库替代 LocalStorage
-- WebSocket 推送多端实时同步
+- 增加打包能力，例如 `electron-builder`，输出 Windows 安装包或免安装包。
+- 为本机 SQLite 增加自动备份/恢复入口。
+- 增加数据迁移版本表，便于未来 schema 演进。
+- 增加安装包构建流程，把当前本机启动链路封装为双击运行的可执行软件。

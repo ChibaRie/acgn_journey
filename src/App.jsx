@@ -272,7 +272,7 @@ export default function App() {
             </div>
             <div>
               <dt>搜索来源</dt>
-              <dd>直连 Bangumi、萌娘百科；AniList、VNDB、月幕Galgame 经代理访问。</dd>
+              <dd>当前为单来源检索：Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣、NyaFun。</dd>
             </div>
           </dl>
 

@@ -1,12 +1,16 @@
 export const ROUTES = {
-  '/api/bangumi': {
+  '/api/sources/bangumi': {
     target: 'https://api.bgm.tv',
     headers: { 'User-Agent': 'MyACGNJourney/0.3 (https://github.com/ChibaRie/My_ACGN_Journey)' },
   },
-  '/api/moegirl': { target: 'https://zh.moegirl.org.cn', headers: {} },
-  '/api/anilist': { target: 'https://graphql.anilist.co', headers: {} },
-  '/api/vndb': { target: 'https://api.vndb.org/kana', headers: {} },
-  '/api/ymgal': { target: 'https://www.ymgal.games', headers: {}, needsYmgalAuth: true },
+  '/api/sources/age': { target: 'https://www.agedm.io', headers: {} },
+  '/api/sources/gugu': { target: 'https://www.gugu3.com', headers: {} },
+  '/api/sources/girigiri': { target: 'http://bgm.girigirilove.com', headers: {} },
+  '/api/sources/douban': {
+    target: 'https://m.douban.com',
+    headers: { Referer: 'https://www.douban.com/search', Accept: 'application/json,text/plain,*/*' },
+  },
+  '/api/sources/nyafun': { target: 'https://www.nyadm.org', headers: {} },
 };
 
 export function matchRoute(pathname) {
@@ -27,8 +31,4 @@ export function corsHeaders(allowedOrigin) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
-}
-
-export function shouldRefreshToken(cache, now) {
-  return !cache || !cache.token || now >= cache.expiresAt;
 }

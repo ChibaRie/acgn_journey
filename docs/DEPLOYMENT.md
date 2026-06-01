@@ -1,10 +1,19 @@
 # 部署指南
 
-本项目部署为 GitHub Pages 静态站 + Cloudflare Worker 搜索代理。前端通过 GitHub Actions 自动部署；Worker 需手动部署一次。
+本项目部署为 GitHub Pages 静态站 + Cloudflare Worker 搜索代理。前端通过 GitHub Actions 自动部署；Worker 在代理路由变更后需手动部署一次。
 
 ## 一、部署 Cloudflare Worker（搜索代理）
 
-需代理的搜索源（Bilibili / AniList / VNDB / 月幕Galgame）依赖该 Worker 转发上游 API，规避浏览器 CORS。Bangumi 与萌娘百科支持 CORS，由浏览器直连，不经 Worker。
+v0.5 的搜索统一走固定白名单代理。Worker 只转发以下六个前缀，不接收任意目标 URL：
+
+| 前端路径 | 上游 |
+|---|---|
+| `/api/sources/bangumi/*` | `https://api.bgm.tv/*` |
+| `/api/sources/age/*` | `https://www.agedm.io/*` |
+| `/api/sources/gugu/*` | `https://www.gugu3.com/*` |
+| `/api/sources/girigiri/*` | `http://bgm.girigirilove.com/*` |
+| `/api/sources/douban/*` | `https://m.douban.com/*` |
+| `/api/sources/nyafun/*` | `https://www.nyadm.org/*` |
 
 1. 安装 wrangler 并登录（需免费 Cloudflare 账号）：
 
@@ -38,16 +47,12 @@
 
 ## 工作原理
 
-- 搜索源分两类：**直连源**（Bangumi、萌娘百科）浏览器直接访问官方 API，不经 Worker、不依赖 `VITE_API_BASE`；**需代理源**（Bilibili、AniList、VNDB、月幕Galgame）走 `/api/<源>` 路径。
-- **本地开发**：`VITE_API_BASE` 为空，需代理源由 Vite dev server 代理转发（见 `vite.config.js`）。
-- **生产**：构建时注入 `VITE_API_BASE`，需代理源请求改打到 Cloudflare Worker，由 Worker 转发到各上游并回填 CORS 头。
-- Worker 路由表（`worker/router.js`）与 Vite 代理表结构一致，是白名单封闭代理——只转发已知的需代理源，其它路径返回 404。
-
-## 月幕Galgame（ymgal）说明
-
-- ymgal 接口需 OAuth2 认证。Worker 用公开凭证（`client_id=ymgal`）自动换取 access_token 并内存缓存约 55 分钟，前端无需配置。
-- 本地开发限制：`npm run dev` 下不经过 Worker，ymgal 缺少 token 注入，可能搜不出结果。其余源在 dev 下正常。ymgal 的完整功能需在 Worker 部署后验证。
+- 搜索 UI 是单来源模式：用户先选择 Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣或 NyaFun，再搜索关键词。
+- `src/search/adapters/*` 负责按来源构造请求、解析 HTML/JSON，并归一化为 `SearchWork`。
+- **本地开发**：`VITE_API_BASE` 为空，所有 `/api/sources/*` 请求由 Vite dev server 代理转发（见 `vite.config.js`）。
+- **生产**：构建时注入 `VITE_API_BASE`，请求改打 Cloudflare Worker，由 Worker 转发到固定上游并回填 CORS 头。
+- Worker 路由表（`worker/router.js`）与 Vite 代理表结构一致，是白名单封闭代理；其它路径返回 404。
 
 ## 本地开发
 
-本地 `npm run dev` 不需要 Worker：直连源（Bangumi、萌娘百科）直接访问官方 API，其余需代理源走 Vite dev-server 代理。仅当你想在本地验证 Worker 本身时才需要 `wrangler dev`。
+本地 `npm run dev` 不需要 Worker。只有验证生产代理本身时才需要 `cd worker && wrangler dev` 或重新部署 Worker。

@@ -2,7 +2,7 @@
 
 ## 1. 项目概述
 
-My ACGN Journey 是一个个人ACG（动画、轻小说、Galgame）作品记录管理单页应用。用户可搜索多源作品信息、将作品加入个人库、追踪观看/阅读/游玩进度、记录评分短评、管理实体藏品、构建作品关系图谱，并通过时间线和统计面板回顾个人历程。
+My ACGN Journey 是一个个人ACG（动画、轻小说、Galgame）作品记录管理单页应用。用户可按单来源检索作品信息、将作品加入个人库、追踪观看/阅读/游玩进度、记录评分短评、管理实体藏品、构建作品关系图谱，并通过时间线和统计面板回顾个人历程。
 
 ## 2. 技术选型与架构决策
 
@@ -13,13 +13,13 @@ My ACGN Journey 是一个个人ACG（动画、轻小说、Galgame）作品记录
 | 状态管理 | useLibrary Hook + LocalStorage | 单页应用无需复杂状态库，自动持久化 |
 | 路由 | Tab 状态切换 | 应用面板少、无需深层路由 |
 | 图标 | Lucide React | 轻量、Tree-shakable、风格统一 |
-| 搜索集成 | Vite Proxy | 解决 CORS，无需后端 |
+| 搜索集成 | 单来源 adapter + Vite/Worker 白名单代理 | 参考 anime_trace 的单站点检索模型，同时解决浏览器 CORS |
 | 数据持久化 | LocalStorage | 即刻可用、备份/恢复简单 |
 | 图表 | 自定义 CSS Bar | 避免引入图表库，设计一致 |
 
 **关键设计决策：**
 - 采用原生 CSS Variables 实现暗夜/日间双主题，通过 `data-theme` 属性切换
-- 搜索请求通过 Vite dev server 代理转发，规避 CORS 限制
+- 搜索请求通过 `src/search/` 的来源 adapter 归一化，再由 Vite dev server 或 Cloudflare Worker 白名单代理转发
 - 所有数据存储在 LocalStorage 单键下，导出为 JSON 备份文件
 - 组件按面板（Panel）拆分，每个面板自包含状态和逻辑
 
@@ -34,7 +34,7 @@ interface LibraryRecord {
   workKey: string;         // 去重键: "{source}:{sourceId}"
 
   // 来源追踪
-  source: string;          // 'bangumi' | 'bilibili' | 'moegirl' | 'manual'
+  source: string;          // 'bangumi' | 'age' | 'gugu' | 'girigiri' | 'douban' | 'nyafun' | 'manual'
   sourceId: string;        // 数据源ID
   sourceUrl: string;       // 原始页面链接
 
@@ -90,7 +90,7 @@ interface Relation {
 interface SearchWork {
   id: string;              // "{source}-{sourceId}"
   source: string;
-  sourceLabel: string;     // "Bangumi" | "Bilibili" | "萌娘百科"
+  sourceLabel: string;     // "Bangumi" | "AGE动漫" | "咕咕番" | ...
   sourceId: string;
   sourceUrl: string;
   title: string;
@@ -132,7 +132,7 @@ App (状态根)
 ├── Workspace (主内容区)
 │   ├── SearchPanel
 │   │   ├── SearchForm (关键词输入)
-│   │   ├── SourceBar (来源选择: Bangumi/Bilibili/萌娘百科)
+│   │   ├── SourceSelector (来源选择: Bangumi/AGE动漫/咕咕番/girigiri愛/豆瓣/NyaFun)
 │   │   ├── WarningStrip (API错误提示)
 │   │   ├── EmptyState (无结果)
 │   │   └── ResultGrid
@@ -177,56 +177,61 @@ App (状态根)
               │            │            │
         SearchPanel  LibraryPanel  TimelinePanel
               │            │            │
-         searchAllSources  filterRecords  getStats
+          searchSource   filterRecords  getStats
               │            │            │
         ┌─────▼─────┐     │            │
         │ Vite Proxy │     │            │
         │ /api/*     │     │            │
         └─────┬─────┘     │            │
               │            │            │
-    ┌─────────┼─────────┐  │            │
-    │         │         │  │            │
-  Bangumi  Bilibili  Moegirl          │
-    API      API       Wiki           │
+          Source adapter
+               │
+        /api/sources/<id>
+               │
+        Vite proxy / Worker
 ```
 
 ### 4.3 API 集成架构
 
-开发环境下，所有外部 API 请求通过 Vite Dev Server 代理转发：
+开发环境下，外部搜索请求通过 Vite Dev Server 代理转发；生产环境通过 Cloudflare Worker 转发。前端不会传入任意上游 URL，只能访问固定的 `/api/sources/<source>` 前缀。
 
 ```
-浏览器 fetch('/api/bangumi/v0/search/subjects')
+浏览器 fetch('/api/sources/age/search?query=...')
     → Vite Dev Server (localhost:5188)
-        → 改写路径去掉 /api/bangumi 前缀
+        → 改写路径去掉 /api/sources/age 前缀
         → 添加浏览器 User-Agent 头
-        → 转发到 https://api.bgm.tv/v0/search/subjects
-        → 返回 JSON 给浏览器
+        → 转发到 https://www.agedm.io/search?query=...
+        → 返回 HTML/JSON 给浏览器
 ```
 
-**三个数据源：**
+**首批六个单来源：**
 
-| 来源 | API端点 | 方法 | 数据格式 |
+| 来源 | 前端路径 | 上游 | 数据格式 |
 |------|---------|------|----------|
-| Bangumi | `POST /v0/search/subjects` | POST JSON | `{ data: Subject[] }` |
-| Bilibili | `GET /x/web-interface/search/type?search_type=media_bangumi` | GET | `{ code, data: { result: [] } }` |
-| 萌娘百科 | `GET /api.php?action=query&generator=search...` | GET (MediaWiki) | `{ query: { pages: [] } }` |
+| Bangumi | `/api/sources/bangumi/*` | `https://api.bgm.tv` | JSON |
+| AGE动漫 | `/api/sources/age/*` | `https://www.agedm.io` | HTML |
+| 咕咕番 | `/api/sources/gugu/*` | `https://www.gugu3.com` | HTML |
+| girigiri愛 | `/api/sources/girigiri/*` | `http://bgm.girigirilove.com` | HTML |
+| 豆瓣 | `/api/sources/douban/*` | `https://m.douban.com` | JSON |
+| NyaFun | `/api/sources/nyafun/*` | `https://www.nyadm.org` | HTML |
 
-**搜索结果聚合策略：**
-1. 使用 `Promise.allSettled` 并行请求三个数据源
-2. 各源独立 `normalize*Item()` 转换为统一的 `SearchWork` 格式
-3. 按 `{source}:{sourceId}` 去重
-4. 失败的源通过 `errors` 对象单独上报，不影响其他源结果展示
+**搜索策略：**
+1. UI 只维护一个 `sourceId`，切换来源不会自动发请求
+2. `searchSource(sourceId, keyword)` 校验来源并调度对应 adapter
+3. Adapter 负责拼 URL、请求、解析 HTML/JSON，并转换为统一的 `SearchWork`
+4. 当前来源失败时只显示该来源错误，不再展示多来源错误列表
 
 ## 5. 关键模块设计
 
-### 5.1 搜索模块 (`api/search.js`)
+### 5.1 搜索模块 (`src/search/`)
 
-- `searchAllSources(keyword, { sources, signal })`: 入口函数，并行调度
-- `searchBangumi()`: POST 请求 Bangumi v0 API，筛选 type=[1,2,4]
-- `searchBilibili()`: GET 请求 Bilibili 搜索 API
-- `searchMoegirl()`: GET 请求 MediaWiki API，使用 generator=search
-- 每个源的 `normalize*Item()` 负责 HTML 清洗、URL 修补、标签提取
+- `sources.js`: 六个来源的注册表、默认来源、代理路径构造
+- `searchService.js`: `searchSource(sourceId, keyword, options)` 单来源入口
+- `html.js`: HTML/BBCode 清洗、URL 修补、年份与标签工具
+- `adapters/*.js`: 每个来源一个 adapter，负责请求和归一化
 - 支持 AbortController 取消请求
+
+`src/api/search.js` 仅作为兼容导出层，转发 `src/search/` 的新接口。
 
 ### 5.2 状态管理 (`hooks/useLibrary.js`)
 
@@ -291,7 +296,12 @@ My-ACGN-Journey/
     ├── App.jsx             # 根组件（标签路由、状态协调）
     ├── styles.css          # 全局样式 + 主题变量
     ├── api/
-    │   └── search.js       # 多源搜索 API 模块
+    │   └── search.js       # 搜索兼容导出层
+    ├── search/
+    │   ├── sources.js      # 单来源注册表
+    │   ├── searchService.js # 单来源搜索入口
+    │   ├── html.js         # HTML/URL/标签工具
+    │   └── adapters/       # Bangumi/AGE/咕咕番/girigiri/豆瓣/NyaFun
     ├── hooks/
     │   └── useLibrary.js   # 作品库状态管理 Hook
     ├── utils/
@@ -322,7 +332,7 @@ My-ACGN-Journey/
 - 数据库选择：SQLite（轻量）或 PostgreSQL（扩展性）
 
 ### 9.2 API 同步增强
-- 通过 OAuth 接入 Bangumi / AniList / VNDB 授权
+- 通过 OAuth 接入 Bangumi / AniList / VNDB 等授权同步能力
 - 后端安全保存 access_token 和 refresh_token
 - 定时同步用户在各平台的记录
 - 冲突解决策略：本地优先、远端优先、合并

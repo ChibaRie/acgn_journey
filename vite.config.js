@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 const browserLikeHeaders = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MyACGNJourney/0.1 Safari/537.36',
-  Accept: 'application/json,text/plain,*/*',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
 };
 
 export default defineConfig({
@@ -14,7 +14,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5188,
     proxy: {
-      '/api/bangumi': {
+      '/api/sources/bangumi': {
         target: 'https://api.bgm.tv',
         changeOrigin: true,
         secure: true,
@@ -22,35 +22,46 @@ export default defineConfig({
           ...browserLikeHeaders,
           'User-Agent': 'MyACGNJourney/0.1 (local Vite proxy; https://bangumi.github.io/api/)',
         },
-        rewrite: (path) => path.replace(/^\/api\/bangumi/, ''),
+        rewrite: (path) => path.replace(/^\/api\/sources\/bangumi/, ''),
       },
-      '/api/moegirl': {
-        target: 'https://zh.moegirl.org.cn',
+      '/api/sources/age': {
+        target: 'https://www.agedm.io',
         changeOrigin: true,
         secure: true,
         headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/moegirl/, ''),
+        rewrite: (path) => path.replace(/^\/api\/sources\/age/, ''),
       },
-      '/api/anilist': {
-        target: 'https://graphql.anilist.co',
+      '/api/sources/gugu': {
+        target: 'https://www.gugu3.com',
         changeOrigin: true,
         secure: true,
         headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/anilist/, '') || '/',
+        rewrite: (path) => path.replace(/^\/api\/sources\/gugu/, ''),
       },
-      '/api/vndb': {
-        target: 'https://api.vndb.org/kana',
+      '/api/sources/girigiri': {
+        target: 'http://bgm.girigirilove.com',
+        changeOrigin: true,
+        secure: false,
+        headers: browserLikeHeaders,
+        rewrite: (path) => path.replace(/^\/api\/sources\/girigiri/, ''),
+      },
+      '/api/sources/douban': {
+        target: 'https://m.douban.com',
+        changeOrigin: true,
+        secure: true,
+        headers: {
+          ...browserLikeHeaders,
+          Referer: 'https://www.douban.com/search',
+          Accept: 'application/json,text/plain,*/*',
+        },
+        rewrite: (path) => path.replace(/^\/api\/sources\/douban/, ''),
+      },
+      '/api/sources/nyafun': {
+        target: 'https://www.nyadm.org',
         changeOrigin: true,
         secure: true,
         headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/vndb/, ''),
-      },
-      '/api/ymgal': {
-        target: 'https://www.ymgal.games',
-        changeOrigin: true,
-        secure: true,
-        headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/ymgal/, ''),
+        rewrite: (path) => path.replace(/^\/api\/sources\/nyafun/, ''),
       },
     },
   },

@@ -1,43 +1,43 @@
-import { describe, it, expect } from 'vitest';
-import { matchRoute, rewritePath, corsHeaders, shouldRefreshToken } from './router.js';
+import { describe, expect, it } from 'vitest';
+import { corsHeaders, matchRoute, rewritePath } from './router.js';
 
 describe('matchRoute', () => {
-  it('matches a known prefix to its target + headers', () => {
-    const r = matchRoute('/api/bangumi/v0/search/subjects');
-    expect(r.target).toBe('https://api.bgm.tv');
-    expect(r.headers['User-Agent']).toContain('MyACGNJourney');
+  it('matches the six allowed source prefixes', () => {
+    expect(matchRoute('/api/sources/bangumi/v0/search/subjects').target).toBe('https://api.bgm.tv');
+    expect(matchRoute('/api/sources/age/search').target).toBe('https://www.agedm.io');
+    expect(matchRoute('/api/sources/gugu/index.php/vod/search.html').target).toBe('https://www.gugu3.com');
+    expect(matchRoute('/api/sources/girigiri/search/-------------/').target).toBe(
+      'http://bgm.girigirilove.com',
+    );
+    expect(matchRoute('/api/sources/douban/rexxar/api/v2/search').target).toBe('https://m.douban.com');
+    expect(matchRoute('/api/sources/nyafun/search.html').target).toBe('https://www.nyadm.org');
   });
 
-  it('matches vndb prefix', () => {
-    expect(matchRoute('/api/vndb/vn').target).toBe('https://api.vndb.org/kana');
-  });
-
-  it('returns null for unknown prefix (whitelist closed)', () => {
+  it('returns null for unknown prefixes and sibling prefix confusion', () => {
     expect(matchRoute('/api/evil/passthrough')).toBeNull();
-    expect(matchRoute('/')).toBeNull();
+    expect(matchRoute('/api/sources/ageextra/search')).toBeNull();
+    expect(matchRoute('/api/sources/unknown/search')).toBeNull();
   });
 
-  it('rejects a sibling path with a suffix (prefix-confusion guard)', () => {
-    expect(matchRoute('/api/bangumiXYZ')).toBeNull();
-    expect(matchRoute('/api/vndbextra/x')).toBeNull();
+  it('keeps douban referer headers scoped to the douban route', () => {
+    const route = matchRoute('/api/sources/douban/rexxar/api/v2/search');
+    expect(route.headers.Referer).toBe('https://www.douban.com/search');
   });
 });
 
 describe('rewritePath', () => {
-  it('strips the prefix and keeps the remainder', () => {
-    expect(rewritePath('/api/bangumi', '/api/bangumi/v0/search/subjects')).toBe('/v0/search/subjects');
+  it('strips the source prefix and keeps the remainder', () => {
+    expect(rewritePath('/api/sources/bangumi', '/api/sources/bangumi/v0/search/subjects')).toBe(
+      '/v0/search/subjects',
+    );
   });
 
-  it('falls back to / when the stripped path is empty (anilist fix)', () => {
-    expect(rewritePath('/api/anilist', '/api/anilist')).toBe('/');
-  });
-
-  it('keeps vndb subpath', () => {
-    expect(rewritePath('/api/vndb', '/api/vndb/vn')).toBe('/vn');
+  it('falls back to / when the stripped path is empty', () => {
+    expect(rewritePath('/api/sources/age', '/api/sources/age')).toBe('/');
   });
 
   it('collapses a leading double slash so the remainder cannot be protocol-relative', () => {
-    expect(rewritePath('/api/bangumi', '/api/bangumi//evil.com/x')).toBe('/evil.com/x');
+    expect(rewritePath('/api/sources/age', '/api/sources/age//evil.com/x')).toBe('/evil.com/x');
   });
 });
 
@@ -47,25 +47,5 @@ describe('corsHeaders', () => {
     expect(h['Access-Control-Allow-Origin']).toBe('https://chibarie.github.io');
     expect(h['Access-Control-Allow-Methods']).toContain('POST');
     expect(h['Access-Control-Allow-Headers']).toContain('Content-Type');
-  });
-});
-
-describe('matchRoute ymgal', () => {
-  it('matches /api/ymgal to ymgal target with auth flag', () => {
-    const r = matchRoute('/api/ymgal/open/archive/search-game');
-    expect(r.target).toBe('https://www.ymgal.games');
-    expect(r.needsYmgalAuth).toBe(true);
-  });
-});
-
-describe('shouldRefreshToken', () => {
-  it('refreshes when no cache', () => {
-    expect(shouldRefreshToken(null, 1000)).toBe(true);
-  });
-  it('refreshes when expired', () => {
-    expect(shouldRefreshToken({ token: 'x', expiresAt: 500 }, 1000)).toBe(true);
-  });
-  it('reuses a valid cached token', () => {
-    expect(shouldRefreshToken({ token: 'x', expiresAt: 5000 }, 1000)).toBe(false);
   });
 });

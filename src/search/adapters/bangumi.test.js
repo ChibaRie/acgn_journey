@@ -33,7 +33,7 @@ describe('bangumi adapter', () => {
       },
     });
 
-    expect(calls[0].url).toBe('/api/sources/bangumi/v0/search/subjects?limit=12&offset=0');
+    expect(calls[0].url).toBe('https://api.bgm.tv/v0/search/subjects?limit=12&offset=0');
     expect(calls[0].init.method).toBe('POST');
   });
 });

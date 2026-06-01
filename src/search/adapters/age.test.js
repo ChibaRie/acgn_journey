@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeAgeItem } from './age.js';
+import { normalizeAgeItem, searchAge } from './age.js';
 
 describe('age adapter', () => {
   it('normalizes age search result', () => {
@@ -18,5 +18,17 @@ describe('age adapter', () => {
     expect(work.cover).toBe('https://img.example/age.jpg');
     expect(work.type).toBe('动画');
     expect(work.releaseYear).toBe('2024');
+  });
+
+  it('queries AGE directly because it exposes readable CORS', async () => {
+    const calls = [];
+    await searchAge('孤独摇滚', {
+      fetchImpl: async (url) => {
+        calls.push(url);
+        return { ok: true, text: async () => '' };
+      },
+    });
+
+    expect(calls[0]).toBe('https://www.agedm.io/search?query=%E5%AD%A4%E7%8B%AC%E6%91%87%E6%BB%9A');
   });
 });

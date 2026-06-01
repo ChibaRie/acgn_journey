@@ -13,13 +13,10 @@ describe('search api compatibility exports', () => {
     expect(DEFAULT_SOURCE_ID).toBe('bangumi');
     expect(SOURCES.map((source) => source.id)).toEqual([
       'bangumi',
+      'moegirl',
       'age',
-      'gugu',
-      'girigiri',
-      'douban',
-      'nyafun',
     ]);
-    expect(getSourceById('moegirl')).toBeNull();
+    expect(getSourceById('nyafun')).toBeNull();
   });
 
   it('keeps buildApiUrl for the production worker base', () => {

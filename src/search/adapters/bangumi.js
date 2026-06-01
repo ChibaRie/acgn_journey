@@ -1,4 +1,4 @@
-import { buildSourceUrl } from '../sources.js';
+import { buildDirectUrl } from '../sources.js';
 import { getYear, normalizeUrl, stripHtml, uniqueTags } from '../html.js';
 
 const BANGUMI_TYPE_LABELS = {
@@ -40,7 +40,7 @@ export async function searchBangumi(keyword, { signal, fetchImpl = fetch } = {})
     filter: { type: [1, 2, 4, 6], nsfw: false },
   };
 
-  const response = await fetchImpl(buildSourceUrl('bangumi', '/v0/search/subjects?limit=12&offset=0'), {
+  const response = await fetchImpl(buildDirectUrl('bangumi', '/v0/search/subjects?limit=12&offset=0'), {
     method: 'POST',
     signal,
     headers: { 'Content-Type': 'application/json' },

@@ -272,7 +272,7 @@ export default function App() {
             </div>
             <div>
               <dt>搜索来源</dt>
-              <dd>当前为单来源检索：Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣、NyaFun。</dd>
+              <dd>当前为直连优先的单来源检索：Bangumi、萌娘百科、AGE动漫。</dd>
             </div>
           </dl>
 

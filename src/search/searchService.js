@@ -1,18 +1,12 @@
 import { getSourceById } from './sources.js';
 import { searchBangumi } from './adapters/bangumi.js';
 import { searchAge } from './adapters/age.js';
-import { searchGugu } from './adapters/gugu.js';
-import { searchGirigiri } from './adapters/girigiri.js';
-import { searchDouban } from './adapters/douban.js';
-import { searchNyafun } from './adapters/nyafun.js';
+import { searchMoegirl } from './adapters/moegirl.js';
 
 const SEARCHERS = {
   bangumi: searchBangumi,
+  moegirl: searchMoegirl,
   age: searchAge,
-  gugu: searchGugu,
-  girigiri: searchGirigiri,
-  douban: searchDouban,
-  nyafun: searchNyafun,
 };
 
 export async function searchSource(sourceId, keyword, options = {}) {

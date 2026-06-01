@@ -13,13 +13,13 @@ My ACGN Journey 是一个个人ACG（动画、轻小说、Galgame）作品记录
 | 状态管理 | useLibrary Hook + LocalStorage | 单页应用无需复杂状态库，自动持久化 |
 | 路由 | Tab 状态切换 | 应用面板少、无需深层路由 |
 | 图标 | Lucide React | 轻量、Tree-shakable、风格统一 |
-| 搜索集成 | 单来源 adapter + Vite/Worker 白名单代理 | 参考 anime_trace 的单站点检索模型，同时解决浏览器 CORS |
+| 搜索集成 | 直连优先的单来源 adapter + 可选白名单代理 | 参考 anime_trace 的单站点检索模型，同时降低线上代理部署依赖 |
 | 数据持久化 | LocalStorage | 即刻可用、备份/恢复简单 |
 | 图表 | 自定义 CSS Bar | 避免引入图表库，设计一致 |
 
 **关键设计决策：**
 - 采用原生 CSS Variables 实现暗夜/日间双主题，通过 `data-theme` 属性切换
-- 搜索请求通过 `src/search/` 的来源 adapter 归一化，再由 Vite dev server 或 Cloudflare Worker 白名单代理转发
+- 搜索请求通过 `src/search/` 的来源 adapter 归一化；默认来源直接请求支持 CORS 的上游，非 CORS 友好来源再由 Vite/Worker 白名单代理转发
 - 所有数据存储在 LocalStorage 单键下，导出为 JSON 备份文件
 - 组件按面板（Panel）拆分，每个面板自包含状态和逻辑
 
@@ -34,7 +34,7 @@ interface LibraryRecord {
   workKey: string;         // 去重键: "{source}:{sourceId}"
 
   // 来源追踪
-  source: string;          // 'bangumi' | 'age' | 'gugu' | 'girigiri' | 'douban' | 'nyafun' | 'manual'
+  source: string;          // 'bangumi' | 'moegirl' | 'age' | 'manual' 等
   sourceId: string;        // 数据源ID
   sourceUrl: string;       // 原始页面链接
 
@@ -90,7 +90,7 @@ interface Relation {
 interface SearchWork {
   id: string;              // "{source}-{sourceId}"
   source: string;
-  sourceLabel: string;     // "Bangumi" | "AGE动漫" | "咕咕番" | ...
+  sourceLabel: string;     // "Bangumi" | "萌娘百科" | "AGE动漫" | ...
   sourceId: string;
   sourceUrl: string;
   title: string;
@@ -132,7 +132,7 @@ App (状态根)
 ├── Workspace (主内容区)
 │   ├── SearchPanel
 │   │   ├── SearchForm (关键词输入)
-│   │   ├── SourceSelector (来源选择: Bangumi/AGE动漫/咕咕番/girigiri愛/豆瓣/NyaFun)
+│   │   ├── SourceSelector (来源选择: Bangumi/萌娘百科/AGE动漫)
 │   │   ├── WarningStrip (API错误提示)
 │   │   ├── EmptyState (无结果)
 │   │   └── ResultGrid
@@ -193,27 +193,24 @@ App (状态根)
 
 ### 4.3 API 集成架构
 
-开发环境下，外部搜索请求通过 Vite Dev Server 代理转发；生产环境通过 Cloudflare Worker 转发。前端不会传入任意上游 URL，只能访问固定的 `/api/sources/<source>` 前缀。
+默认搜索源使用浏览器直连，只有非 CORS 友好来源才通过 Vite Dev Server 或 Cloudflare Worker 转发。前端不会传入任意上游 URL；代理候选源只能访问固定的 `/api/sources/<source>` 前缀。
 
 ```
-浏览器 fetch('/api/sources/age/search?query=...')
-    → Vite Dev Server (localhost:5188)
-        → 改写路径去掉 /api/sources/age 前缀
-        → 添加浏览器 User-Agent 头
-        → 转发到 https://www.agedm.io/search?query=...
-        → 返回 HTML/JSON 给浏览器
+浏览器 fetch('https://www.agedm.io/search?query=...')
+    → AGE动漫搜索页
+    → 返回带 Access-Control-Allow-Origin 的 HTML
+    → adapter 解析为 SearchWork
 ```
 
-**首批六个单来源：**
+**默认直连来源：**
 
-| 来源 | 前端路径 | 上游 | 数据格式 |
+| 来源 | 上游 | 数据格式 |
 |------|---------|------|----------|
-| Bangumi | `/api/sources/bangumi/*` | `https://api.bgm.tv` | JSON |
-| AGE动漫 | `/api/sources/age/*` | `https://www.agedm.io` | HTML |
-| 咕咕番 | `/api/sources/gugu/*` | `https://www.gugu3.com` | HTML |
-| girigiri愛 | `/api/sources/girigiri/*` | `http://bgm.girigirilove.com` | HTML |
-| 豆瓣 | `/api/sources/douban/*` | `https://m.douban.com` | JSON |
-| NyaFun | `/api/sources/nyafun/*` | `https://www.nyadm.org` | HTML |
+| Bangumi | `https://api.bgm.tv` | JSON |
+| 萌娘百科 | `https://zh.moegirl.org.cn/api.php?origin=*` | JSON |
+| AGE动漫 | `https://www.agedm.io/search?query=...` | HTML |
+
+**代理候选来源：** 咕咕番、girigiri愛、豆瓣、NyaFun。它们需要 Worker/Vite 代理或额外反爬适配，当前不默认展示。
 
 **搜索策略：**
 1. UI 只维护一个 `sourceId`，切换来源不会自动发请求
@@ -225,7 +222,7 @@ App (状态根)
 
 ### 5.1 搜索模块 (`src/search/`)
 
-- `sources.js`: 六个来源的注册表、默认来源、代理路径构造
+- `sources.js`: 默认直连来源注册表、代理路径构造
 - `searchService.js`: `searchSource(sourceId, keyword, options)` 单来源入口
 - `html.js`: HTML/BBCode 清洗、URL 修补、年份与标签工具
 - `adapters/*.js`: 每个来源一个 adapter，负责请求和归一化
@@ -301,7 +298,7 @@ My-ACGN-Journey/
     │   ├── sources.js      # 单来源注册表
     │   ├── searchService.js # 单来源搜索入口
     │   ├── html.js         # HTML/URL/标签工具
-    │   └── adapters/       # Bangumi/AGE/咕咕番/girigiri/豆瓣/NyaFun
+    │   └── adapters/       # Bangumi/萌娘百科/AGE + 代理候选 adapters
     ├── hooks/
     │   └── useLibrary.js   # 作品库状态管理 Hook
     ├── utils/

@@ -8,7 +8,7 @@
 
 线上地址：https://chibarie.github.io/My_ACGN_Journey/
 
-本地库数据保存在浏览器。搜索通过固定白名单代理访问 Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣与 NyaFun，部署方式见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+本地库数据保存在浏览器。当前默认搜索源为浏览器可直连读取的 Bangumi、萌娘百科与 AGE动漫；部署方式见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
 ## 技术栈
 
@@ -20,9 +20,9 @@
 | 样式 | 原生 CSS + CSS Variables | 零依赖，`data-theme` 切换暗夜/日间双主题 |
 | 状态与持久化 | `useLibrary` Hook + LocalStorage | 单键存储，自动同步，无外部状态库 |
 | 单元测试 | Vitest (`4.1.7`) | 覆盖搜索归一化与 Worker 路由逻辑 |
-| 搜索代理 | Vite dev proxy（开发）/ Cloudflare Workers（生产） | 同构白名单路由表，规避浏览器 CORS |
+| 搜索代理 | 直连优先；Vite dev proxy / Cloudflare Workers 作为增强 | 默认源可浏览器直连，代理用于后续扩展非 CORS 友好源 |
 | 部署 | GitHub Pages + GitHub Actions（Node 20） | 推送 main 自动构建并发布 |
-| 数据源 | Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣、NyaFun | 单来源检索，一次只查询当前选中的来源 |
+| 数据源 | Bangumi、萌娘百科、AGE动漫 | 单来源检索，一次只查询当前选中的来源 |
 
 ## 运行
 
@@ -47,7 +47,7 @@ Windows 用户也可以直接双击：
 
 ## 已实现功能
 
-- 单来源作品搜索：Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣、NyaFun。
+- 单来源作品搜索：Bangumi、萌娘百科、AGE动漫。
 - 搜索结果展示：标题、封面、类型、简介、来源站点和来源链接。
 - 各源会尽量提取年份、评分、标签或状态等附加信息；站点结构变化时会显示当前来源的错误。
 - 一键加入我的库：默认标记为完成状态，并按类型显示“已看 / 已读 / 已玩”。
@@ -66,9 +66,10 @@ Windows 用户也可以直接双击：
 
 ### v0.5（当前）
 
-- **搜索核心替换为 anime_trace 式单来源模式**：移除旧的 AniList / VNDB / 月幕Galgame / 萌娘百科聚合搜索入口，新增 Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣、NyaFun 六个可单独选择的来源。
+- **搜索核心替换为 anime_trace 式单来源模式**：移除旧的 AniList / VNDB / 月幕Galgame 聚合搜索入口，搜索 UI 改为“先选来源，再搜作品”。
 - **代理白名单重建**：本地 Vite proxy 与 Cloudflare Worker 只允许 `/api/sources/<source>` 六个固定前缀，不通过 query/body 传入任意上游 URL。
 - **结果入库流程不变**：搜索结果仍归一化为 `SearchWork`，继续复用「加入我的库」、时间线、统计和编辑流程。
+- **直连热修**：线上默认来源收缩为实测可浏览器直连读取的 Bangumi、萌娘百科、AGE动漫；咕咕番、girigiri愛、豆瓣、NyaFun 保留为代理可用后的候选，不再默认展示导致 404。
 
 ### v0.4
 
@@ -93,9 +94,15 @@ Windows 用户也可以直接双击：
 
 ## 跨域方案
 
-搜索源统一走固定白名单代理，避免浏览器 CORS 限制，也避免 Worker 成为开放代理。前端只访问 `/api/sources/<source>` 路径，由 Vite dev proxy 或 Cloudflare Worker 转发到固定上游。
+当前默认搜索源优先直连，避免线上 Worker 未同步部署时全部 404。实测可直连读取的来源：
 
-当前允许的搜索代理路由：
+- Bangumi 官方 API：`https://api.bgm.tv/v0/search/subjects`
+- 萌娘百科 MediaWiki API：`https://zh.moegirl.org.cn/api.php?origin=*`
+- AGE动漫搜索页：`https://www.agedm.io/search?query=...`
+
+非 CORS 友好来源仍需固定白名单代理，避免 Worker 成为开放代理。前端如启用代理候选源，只访问 `/api/sources/<source>` 路径，由 Vite dev proxy 或 Cloudflare Worker 转发到固定上游。
+
+当前保留的搜索代理候选路由：
 
 - `/api/sources/bangumi/*` -> `https://api.bgm.tv/*`
 - `/api/sources/age/*` -> `https://www.agedm.io/*`
@@ -112,8 +119,8 @@ Windows 用户也可以直接双击：
 
 ## 数据来源
 
-- 作品数据来自 Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣与 NyaFun。
-- AGE动漫、咕咕番、girigiri愛、豆瓣、NyaFun 的检索 URL 与首版解析思路参考了 [anime_trace](https://github.com/linyi102/anime_trace) 的公开实现，并按本项目的 Web/CORS 架构重写。
+- 作品数据默认来自 Bangumi、萌娘百科与 AGE动漫。
+- AGE动漫的检索 URL 与首版解析思路参考了 [anime_trace](https://github.com/linyi102/anime_trace) 的公开实现，并按本项目的 Web/CORS 架构重写。
 
 ## License
 

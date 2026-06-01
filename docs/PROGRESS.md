@@ -9,8 +9,8 @@
 |---|---|
 | 版本 | v0.5.0 |
 | 发布目标 | 推送到 `main` 后由 GitHub Actions 发布 |
-| 搜索模式 | anime_trace 式单来源检索 |
-| 搜索源 | 6 个：Bangumi、AGE动漫、咕咕番、girigiri愛、豆瓣、NyaFun |
+| 搜索模式 | 直连优先的 anime_trace 式单来源检索 |
+| 默认搜索源 | 3 个：Bangumi、萌娘百科、AGE动漫 |
 | 在线部署 | GitHub Pages + Cloudflare Worker |
 | 线上地址 | https://chibarie.github.io/My_ACGN_Journey/ |
 | 代理地址 | https://acgn-proxy.rie-acgn-journey.workers.dev |
@@ -27,14 +27,17 @@
 - 当前来源失败时只显示该来源的错误。
 - 搜索结果仍归一化为现有 `SearchWork`，继续复用「加入我的库」、时间线、统计和编辑流程。
 
-首批来源：
+默认来源：
 
 - Bangumi
+- 萌娘百科
 - AGE动漫
-- 咕咕番
-- girigiri愛
-- 豆瓣
-- NyaFun
+
+咕咕番、girigiri愛、豆瓣、NyaFun 已保留 adapter/代理候选，但实测不适合默认线上直连：
+
+- 咕咕番、girigiri愛：页面可访问但无 CORS，需代理。
+- 豆瓣：部分 JSON 接口有 CORS 头但请求限制较多，直接读取不稳定。
+- NyaFun：当前返回跳转/校验页，需后续单独适配。
 
 ### 2. 新搜索模块结构
 
@@ -50,15 +53,16 @@ src/search/
     age.js
     gugu.js
     girigiri.js
-    douban.js
-    nyafun.js
+    douban.js        # 代理候选
+    nyafun.js        # 代理候选
+    moegirl.js
 ```
 
-`src/api/search.js` 改为兼容导出层，仅转发新搜索模块，不再保留旧的 AniList / VNDB / 月幕Galgame / 萌娘百科聚合逻辑。
+`src/api/search.js` 改为兼容导出层，仅转发新搜索模块，不再保留旧的 AniList / VNDB / 月幕Galgame 聚合逻辑。萌娘百科以直连单来源身份回归。
 
 ### 3. 代理白名单重建
 
-Vite dev proxy 与 Cloudflare Worker 均改为六个固定前缀：
+Vite dev proxy 与 Cloudflare Worker 均保留固定前缀，供后续启用非 CORS 友好来源：
 
 ```text
 /api/sources/bangumi/*
@@ -85,6 +89,10 @@ Vite dev proxy 与 Cloudflare Worker 均改为六个固定前缀：
 - `docs/ARCHITECTURE.md`
 - `docs/DEPLOYMENT.md`
 - `docs/PROGRESS.md`
+
+### 5. 线上 404 修正
+
+v0.5 首次发布后，前端已切到 `/api/sources/*`，但线上 Worker 仍是旧部署；本机 wrangler token 又无 Cloudflare 部署权限，导致默认来源全部命中旧 Worker 404。修正策略是默认展示直连可读来源，降低对 Worker 同步部署的依赖。
 
 ## 历史版本摘要
 

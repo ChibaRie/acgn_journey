@@ -1,4 +1,4 @@
-import { buildSourceUrl } from '../sources.js';
+import { buildDirectUrl } from '../sources.js';
 import { getAttr, getText, getYear, normalizeUrl, parseDocument, stripHtml, uniqueTags } from '../html.js';
 
 const AGE_BASE = 'https://www.agedm.io';
@@ -49,7 +49,7 @@ export function parseAgeHtml(html) {
 }
 
 export async function searchAge(keyword, { signal, fetchImpl = fetch } = {}) {
-  const response = await fetchImpl(buildSourceUrl('age', `/search?query=${encodeURIComponent(keyword)}`), { signal });
+  const response = await fetchImpl(buildDirectUrl('age', `/search?query=${encodeURIComponent(keyword)}`), { signal });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`.trim());
   }

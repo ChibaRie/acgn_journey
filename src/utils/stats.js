@@ -50,7 +50,8 @@ export function filterRecords(records, filters) {
       !keyword ||
       record.title.toLowerCase().includes(keyword) ||
       record.comment.toLowerCase().includes(keyword) ||
-      record.tags.some((tag) => tag.toLowerCase().includes(keyword));
+      record.tags.some((tag) => tag.toLowerCase().includes(keyword)) ||
+      (record.animeTags || []).some((tag) => tag.toLowerCase().includes(keyword));
     const categoryMatch =
       !filters.category ||
       filters.category === 'all' ||

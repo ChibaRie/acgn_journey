@@ -9,9 +9,11 @@ v0.5 继续保留《漫迹》式“先选来源，再搜作品”的交互，但
 
 当前 active 搜索源只保留墙内直连优先、已验证可浏览器读取的来源：
 
-1. 萌娘百科
-2. AGE动漫
-3. Bangumi
+1. AGE动漫（直连）
+2. 萌娘百科（直连）
+3. Bangumi（需代理；未配置代理时尝试官方 API 直连 fallback）
+
+另新增 trace.moe 截图识别，不作为文字搜索源 chip，而是独立面板。
 
 咕咕番、girigiri愛、豆瓣、NyaFun 不再作为候选源保留。它们已从 UI、adapter、测试、Vite 代理和 Worker 白名单中移除。
 
@@ -23,7 +25,9 @@ v0.5 继续保留《漫迹》式“先选来源，再搜作品”的交互，但
 
 ## 当前实现原则
 
-- 默认来源必须能在浏览器中直连读取，避免依赖未同步部署的 Worker。
-- 来源顺序按墙内直连优先：萌娘百科、AGE动漫、Bangumi。
+- 默认来源优先使用浏览器直连，避免依赖未同步部署的 Worker。
+- 来源顺序按用户指定：AGE动漫、萌娘百科、Bangumi。
+- AGE动漫解析首播时间、制作公司、剧情类型/标签，并单独保存为 `animeTags` 供词云使用。
+- trace.moe 使用 `/search?anilistInfo`，支持图片 URL 和 multipart 表单上传。
 - Cloudflare Worker / Vite dev proxy 只保留已验证来源的固定白名单 fallback。
 - 未来新增来源前，必须先验证墙内可用性、CORS/代理策略和解析稳定性。

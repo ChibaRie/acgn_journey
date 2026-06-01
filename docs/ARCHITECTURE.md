@@ -52,6 +52,7 @@ interface LibraryRecord {
   rating: number;          // 0-10 整数评分
   comment: string;         // 短评
   tags: string[];          // 用户标签
+  animeTags: string[];     // 来源解析出的动漫标签，供词云/标签统计使用
 
   // 时间追踪
   startedAt: string;       // 开始日期 (YYYY-MM-DD)
@@ -126,17 +127,18 @@ wish (想看) → active (在看) → done (已看)
 ```
 App (状态根)
 ├── Topbar
-│   ├── Brand (Logo + 标题 + 统计概览)
-│   ├── TabBar (7个标签页切换)
+│   ├── Brand (标题 + 统计概览)
+│   ├── TabBar (8个标签页切换)
 │   └── TopbarMeta (总览数字)
 ├── Workspace (主内容区)
 │   ├── SearchPanel
 │   │   ├── SearchForm (关键词输入)
-│   │   ├── SourceSelector (来源选择: Bangumi/萌娘百科/AGE动漫)
+│   │   ├── SourceSelector (来源选择: AGE动漫/萌娘百科/Bangumi)
 │   │   ├── WarningStrip (API错误提示)
 │   │   ├── EmptyState (无结果)
 │   │   └── ResultGrid
 │   │       └── WorkCard[] (搜索结果卡片)
+│   ├── TraceMoePanel (截图识别)
 │   ├── LibraryPanel
 │   │   ├── CategoryRow (分类筛选chip)
 │   │   ├── YearCategoryRow (作品年份筛选chip)
@@ -149,6 +151,7 @@ App (状态根)
 │   ├── BulkImportPanel (批量导入)
 │   ├── TimelinePanel (时间线)
 │   └── StatsPanel (统计面板)
+├── Footer (GitHub 仓库链接)
 ├── RecordEditor (编辑弹窗，模态)
 ├── SettingsPopover (设置面板)
 ├── FloatingToolbar (右下角主题/设置按钮)
@@ -187,7 +190,7 @@ App (状态根)
 
 ### 4.3 API 集成架构
 
-默认搜索源使用浏览器直连，按墙内直连优先排序。当前不保留“先藏起来以后再说”的候选源；无法稳定直连或需要额外反爬适配的来源会先从 UI、adapter、测试和代理白名单中删除。
+默认文字搜索源按 AGE动漫、萌娘百科、Bangumi 排序。AGE动漫和萌娘百科标注为直连；Bangumi 在 UI 中标注为需代理，但代码保留官方 API 直连 fallback，避免未配置 Worker 的环境彻底不可用。当前不保留“先藏起来以后再说”的候选源；无法稳定直连或需要额外反爬适配的来源会先从 UI、adapter、测试和代理白名单中删除。
 
 ```
 浏览器 fetch('https://www.agedm.io/search?query=...')
@@ -200,9 +203,10 @@ App (状态根)
 
 | 来源 | 上游 | 数据格式 |
 |------|------|------|
-| 萌娘百科 | `https://zh.moegirl.org.cn/api.php?origin=*` | JSON |
 | AGE动漫 | `https://www.agedm.io/search?query=...` | HTML |
+| 萌娘百科 | `https://zh.moegirl.org.cn/api.php?origin=*` | JSON |
 | Bangumi | `https://api.bgm.tv` | JSON |
+| trace.moe | `https://api.trace.moe/search?anilistInfo` | JSON |
 
 **已舍弃来源：** 咕咕番、girigiri愛、豆瓣、NyaFun。它们分别存在无 CORS、接口限制、跳转校验或解析稳定性问题，重新接入前必须先完成墙内可用性验证。
 
@@ -212,6 +216,12 @@ App (状态根)
 3. Adapter 负责拼 URL、请求、解析 HTML/JSON，并转换为统一的 `SearchWork`
 4. 当前来源失败时只显示该来源错误，不再展示多来源错误列表
 
+**截图识别策略：**
+1. `TraceMoePanel` 独立于文字搜索源，支持图片 URL 和本地文件上传
+2. `searchTraceMoe()` 调用 trace.moe `/search?anilistInfo`，默认加 `cutBorders`
+3. 返回结果按 AniList 信息、集数、时间点和相似度归一化为 `SearchWork`
+4. 用户可将识别结果直接加入本地作品库
+
 ## 5. 关键模块设计
 
 ### 5.1 搜索模块 (`src/search/`)
@@ -219,7 +229,7 @@ App (状态根)
 - `sources.js`: 默认直连来源注册表与可选代理 fallback 路径构造
 - `searchService.js`: `searchSource(sourceId, keyword, options)` 单来源入口
 - `html.js`: HTML/BBCode 清洗、URL 修补、年份与标签工具
-- `adapters/*.js`: 每个来源一个 adapter，负责请求和归一化
+- `adapters/*.js`: 每个来源一个 adapter，负责请求和归一化；`traceMoe.js` 负责截图识别
 - 支持 AbortController 取消请求
 
 `src/api/search.js` 仅作为兼容导出层，转发 `src/search/` 的新接口。
@@ -229,7 +239,7 @@ App (状态根)
 - `records` state 初始化自 LocalStorage
 - 通过 `useEffect` 自动同步到 LocalStorage
 - `hasWork(work)`: 通过 `workKey` 集合快速判断是否已入库
-- `addWork(work)`: 从 SearchWork 创建新 record，默认状态为 'done'
+- `addWork(work)`: 从 SearchWork 创建新 record，默认状态为 'done'，并保留来源侧 `animeTags`
 - `updateRecord(id, patch)`: 部分更新，自动记录 updatedAt
 - `deleteRecord(id)`: 同时清理相关 relations
 - `replaceRecords()` / `mergeRecords()`: 导入场景
@@ -274,12 +284,10 @@ My-ACGN-Journey/
 ├── index.html              # 入口 HTML
 ├── package.json            # 依赖说明
 ├── vite.config.js          # Vite 配置 + API 代理
-├── img.ico                 # 网站图标
 ├── README.md               # 项目说明
 ├── LICENSE                 # MIT License
-├── my-acgn-journey.bat     # 一键启停
-├── start-dev.bat           # 仅启动
-├── stop-dev.bat            # 仅停止
+├── scripts/
+│   └── dev-server.mjs      # 统一启停命令工具
 ├── docs/
 │   └── ARCHITECTURE.md     # 本文件
 └── src/
@@ -292,7 +300,7 @@ My-ACGN-Journey/
     │   ├── sources.js      # 单来源注册表
     │   ├── searchService.js # 单来源搜索入口
     │   ├── html.js         # HTML/URL/标签工具
-    │   └── adapters/       # 萌娘百科/AGE/Bangumi adapters
+    │   └── adapters/       # AGE/萌娘百科/Bangumi/trace.moe adapters
     ├── hooks/
     │   └── useLibrary.js   # 作品库状态管理 Hook
     ├── utils/

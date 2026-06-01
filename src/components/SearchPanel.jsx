@@ -76,6 +76,9 @@ export default function SearchPanel({ hasWork, onAddWork }) {
           <span className="source-current">
             <Database size={15} />
             {selectedSource.label}
+            <em className={`source-access ${selectedSource.accessKind || 'direct'}`}>
+              {selectedSource.accessLabel}
+            </em>
           </span>
         </div>
 
@@ -88,7 +91,10 @@ export default function SearchPanel({ hasWork, onAddWork }) {
               onClick={() => handleSourceChange(source.id)}
               aria-pressed={sourceId === source.id}
             >
-              {source.label}
+              <span>{source.label}</span>
+              <em className={`source-access ${source.accessKind || 'direct'}`}>
+                {source.accessLabel}
+              </em>
             </button>
           ))}
         </div>

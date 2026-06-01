@@ -136,69 +136,72 @@ export default function LibraryPanel({ records, onEditRecord, onDeleteRecord }) 
       )}
 
       <div className="library-list">
-        {filteredRecords.map((record) => (
-          <article className="library-item" key={record.id}>
-            <div className="mini-cover">
-              {record.cover ? (
-                <img
-                  src={record.cover}
-                  alt={`${record.title} 封面`}
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <span>{record.title.slice(0, 2)}</span>
-              )}
-            </div>
+        {filteredRecords.map((record) => {
+          const displayTags = record.tags.length > 0 ? record.tags : record.animeTags || [];
+          return (
+            <article className="library-item" key={record.id}>
+              <div className="mini-cover">
+                {record.cover ? (
+                  <img
+                    src={record.cover}
+                    alt={`${record.title} 封面`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span>{record.title.slice(0, 2)}</span>
+                )}
+              </div>
 
-            <div className="library-content">
-              <div className="library-title-row">
-                <div>
-                  <h3>{record.title}</h3>
-                  <p>
-                    {record.type} · {record.source}
-                  </p>
+              <div className="library-content">
+                <div className="library-title-row">
+                  <div>
+                    <h3>{record.title}</h3>
+                    <p>
+                      {record.type} · {record.source}
+                    </p>
+                  </div>
+                  <span className="status-pill">{getStatusLabel(record.status, record.type)}</span>
                 </div>
-                <span className="status-pill">{getStatusLabel(record.status, record.type)}</span>
+
+                <p className="summary compact">{record.comment || record.summary || '暂无短评。'}</p>
+
+                <div className="record-meta">
+                  <span>
+                    <Star size={15} />
+                    {record.rating > 0 ? `${record.rating}/10` : '未评分'}
+                  </span>
+                  <span>{getWorkYear(record)} 年</span>
+                  <span>
+                    <Tag size={15} />
+                    {displayTags.length > 0 ? displayTags.join(' / ') : '无标签'}
+                  </span>
+                </div>
               </div>
 
-              <p className="summary compact">{record.comment || record.summary || '暂无短评。'}</p>
-
-              <div className="record-meta">
-                <span>
-                  <Star size={15} />
-                  {record.rating > 0 ? `${record.rating}/10` : '未评分'}
-                </span>
-                <span>{getWorkYear(record)} 年</span>
-                <span>
-                  <Tag size={15} />
-                  {record.tags.length > 0 ? record.tags.join(' / ') : '无标签'}
-                </span>
+              <div className="item-actions">
+                <button
+                  className="icon-button"
+                  type="button"
+                  onClick={() => onEditRecord(record)}
+                  aria-label={`编辑 ${record.title}`}
+                  title="编辑"
+                >
+                  <Edit3 size={17} />
+                </button>
+                <button
+                  className="icon-button danger"
+                  type="button"
+                  onClick={() => confirmDelete(record)}
+                  aria-label={`删除 ${record.title}`}
+                  title="删除"
+                >
+                  <Trash2 size={17} />
+                </button>
               </div>
-            </div>
-
-            <div className="item-actions">
-              <button
-                className="icon-button"
-                type="button"
-                onClick={() => onEditRecord(record)}
-                aria-label={`编辑 ${record.title}`}
-                title="编辑"
-              >
-                <Edit3 size={17} />
-              </button>
-              <button
-                className="icon-button danger"
-                type="button"
-                onClick={() => confirmDelete(record)}
-                aria-label={`删除 ${record.title}`}
-                title="删除"
-              >
-                <Trash2 size={17} />
-              </button>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

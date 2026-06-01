@@ -1,5 +1,6 @@
 node_modules
 dist
+.claude/
 .chrome-cdp*
 .env
 .env.local
@@ -8,4 +9,5 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 vite-dev*.log
+.dev-server.pid
 verification-*.png

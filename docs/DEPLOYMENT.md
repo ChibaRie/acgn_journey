@@ -4,11 +4,13 @@
 
 ## 一、可选部署 Cloudflare Worker（搜索代理）
 
-默认可直连来源不依赖 Worker，并按墙内直连优先排序：
+默认可直连来源不依赖 Worker，并按当前 UI 顺序排序：
 
-- 萌娘百科 MediaWiki API
 - AGE动漫搜索页
-- Bangumi 官方 API
+- 萌娘百科 MediaWiki API
+- trace.moe 截图识别 API
+
+Bangumi 在 UI 中标注为需代理；如果未配置 `VITE_API_BASE`，前端仍会尝试官方 API 直连 fallback。
 
 Worker 只转发以下仍保留的固定前缀，不接收任意目标 URL：
 
@@ -53,7 +55,8 @@ Worker 只转发以下仍保留的固定前缀，不接收任意目标 URL：
 
 ## 工作原理
 
-- 搜索 UI 是单来源模式：用户先选择萌娘百科、AGE动漫或 Bangumi，再搜索关键词。
+- 搜索 UI 是单来源模式：用户先选择 AGE动漫、萌娘百科或 Bangumi，再搜索关键词。
+- “截图识别”面板直接调用 trace.moe，可上传本地截图或粘贴图片 URL。
 - `src/search/adapters/*` 负责按来源构造请求、解析 HTML/JSON，并归一化为 `SearchWork`。
 - **本地开发**：默认来源直接请求上游；保留的代理 fallback 可由 Vite dev server 转发（见 `vite.config.js`）。
 - **生产**：默认来源直接请求上游；若未来启用代理 fallback，构建时注入 `VITE_API_BASE`，请求改打 Cloudflare Worker，由 Worker 转发到固定上游并回填 CORS 头。
@@ -61,4 +64,4 @@ Worker 只转发以下仍保留的固定前缀，不接收任意目标 URL：
 
 ## 本地开发
 
-本地 `npm run dev` 不需要 Worker。只有验证生产代理本身时才需要 `cd worker && wrangler dev` 或重新部署 Worker。
+本地默认使用 `npm run app` 统一启停开发服务；需要前台查看 Vite 日志时也可以直接运行 `npm run dev`。本地开发不需要 Worker。只有验证生产代理本身时才需要 `cd worker && wrangler dev` 或重新部署 Worker。

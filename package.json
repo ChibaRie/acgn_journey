@@ -1,11 +1,17 @@
 {
   "name": "my-acgn-journey",
-  "version": "0.5.0",
+  "version": "0.5.2",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5188",
+    "app": "node scripts/dev-server.mjs toggle",
+    "app:start": "node scripts/dev-server.mjs start",
+    "app:stop": "node scripts/dev-server.mjs stop",
+    "app:restart": "node scripts/dev-server.mjs restart",
+    "app:status": "node scripts/dev-server.mjs status",
+    "app:help": "node scripts/dev-server.mjs help",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4174",
     "test": "vitest run"

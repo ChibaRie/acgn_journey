@@ -1,27 +1,34 @@
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
-export const DEFAULT_SOURCE_ID = 'moegirl';
+export const DEFAULT_SOURCE_ID = 'age';
 
 export const SOURCES = [
   {
-    id: 'moegirl',
-    label: '萌娘百科',
-    description: 'MediaWiki API 支持 origin=* 跨域参数，墙内直连优先。',
-    directBase: 'https://zh.moegirl.org.cn',
-  },
-  {
     id: 'age',
     label: 'AGE动漫',
+    accessLabel: '直连',
+    accessKind: 'direct',
     description: '动画资源站，搜索页返回可读 CORS，按 anime_trace 的 /search?query= 入口检索。',
     directBase: 'https://www.agedm.io',
     proxyPrefix: '/api/sources/age',
   },
   {
+    id: 'moegirl',
+    label: '萌娘百科',
+    accessLabel: '直连',
+    accessKind: 'direct',
+    description: 'MediaWiki API 支持 origin=* 跨域参数，墙内直连优先。',
+    directBase: 'https://zh.moegirl.org.cn',
+  },
+  {
     id: 'bangumi',
     label: 'Bangumi',
-    description: '官方 API 支持 CORS，可浏览器直连，适合作为基础元数据来源。',
+    accessLabel: '需代理',
+    accessKind: 'proxy',
+    description: '条目元数据较完整；墙内访问建议配置代理，未配置时会尝试官方 API 直连。',
     directBase: 'https://api.bgm.tv',
     proxyPrefix: '/api/sources/bangumi',
+    proxyPreferred: true,
   },
 ];
 
@@ -56,4 +63,15 @@ export function buildDirectUrl(sourceId, upstreamPath) {
 
   const path = upstreamPath.startsWith('/') ? upstreamPath : `/${upstreamPath}`;
   return `${source.directBase.replace(/\/$/, '')}${path}`;
+}
+
+export function buildPreferredUrl(sourceId, upstreamPath, base = API_BASE) {
+  const source = getSourceById(sourceId);
+  if (!source) {
+    throw new Error(`未知搜索源：${sourceId}`);
+  }
+  if (source.proxyPreferred && base) {
+    return buildSourceUrl(sourceId, upstreamPath, base);
+  }
+  return buildDirectUrl(sourceId, upstreamPath);
 }

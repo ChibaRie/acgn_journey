@@ -3,6 +3,7 @@ import {
   DEFAULT_SOURCE_ID,
   SOURCES,
   buildApiUrl,
+  buildPreferredUrl,
   buildSourceUrl,
   getSourceById,
   searchSource,
@@ -10,10 +11,10 @@ import {
 
 describe('search api compatibility exports', () => {
   it('re-exports the single-source registry', () => {
-    expect(DEFAULT_SOURCE_ID).toBe('moegirl');
+    expect(DEFAULT_SOURCE_ID).toBe('age');
     expect(SOURCES.map((source) => source.id)).toEqual([
-      'moegirl',
       'age',
+      'moegirl',
       'bangumi',
     ]);
     expect(getSourceById('nyafun')).toBeNull();
@@ -28,10 +29,13 @@ describe('search api compatibility exports', () => {
 
   it('builds source proxy urls only for retained proxy routes', () => {
     expect(buildSourceUrl('age', '/search?query=x')).toBe('/api/sources/age/search?query=x');
+    expect(buildPreferredUrl('bangumi', '/v0/search/subjects', 'https://w.example.dev')).toBe(
+      'https://w.example.dev/api/sources/bangumi/v0/search/subjects',
+    );
     expect(() => buildSourceUrl('gugu', '/index.php/vod/search.html?wd=x')).toThrow('未知搜索源');
   });
 
   it('re-exports the single-source search function', async () => {
-    await expect(searchSource('moegirl', '')).resolves.toEqual({ items: [], error: null });
+    await expect(searchSource('age', '')).resolves.toEqual({ items: [], error: null });
   });
 });

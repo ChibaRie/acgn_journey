@@ -67,7 +67,7 @@ export function getToday() {
 
 function getSearchText(input) {
   if (typeof input === 'string') return input.toLowerCase();
-  return [input?.type, input?.title, input?.originalTitle, ...(input?.tags || [])]
+  return [input?.type, input?.title, input?.originalTitle, ...(input?.tags || []), ...(input?.animeTags || [])]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
@@ -210,6 +210,7 @@ export function createRecordFromWork(work, overrides = {}) {
     tags: Array.isArray(overrides.tags)
       ? normalizeTags(overrides.tags)
       : normalizeTags(work.tags || []),
+    animeTags: normalizeTags(overrides.animeTags || work.animeTags || []),
     inventory: normalizeInventory(overrides.inventory),
     relations: normalizeRelations(overrides.relations),
     startedAt: overrides.startedAt || '',
@@ -303,6 +304,7 @@ export function normalizeRecord(record) {
     rating: Number(record.rating || 0),
     comment: record.comment || '',
     tags: normalizeTags(record.tags || []),
+    animeTags: normalizeTags(record.animeTags || []),
     inventory: normalizeInventory(record.inventory),
     relations: normalizeRelations(record.relations),
     startedAt: record.startedAt || '',

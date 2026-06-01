@@ -3,6 +3,8 @@ import {
   BarChart3,
   Clock3,
   Download,
+  ExternalLink,
+  Github,
   Image as ImageIcon,
   Library,
   Moon,
@@ -16,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import SearchPanel from './components/SearchPanel.jsx';
+import TraceMoePanel from './components/TraceMoePanel.jsx';
 import LibraryPanel from './components/LibraryPanel.jsx';
 import TimelinePanel from './components/TimelinePanel.jsx';
 import StatsPanel from './components/StatsPanel.jsx';
@@ -33,6 +36,7 @@ const THEME_KEY = 'my-acgn-journey:theme';
 
 const TABS = [
   { id: 'search', label: '搜索', icon: Search },
+  { id: 'trace', label: '截图识别', icon: ImageIcon },
   { id: 'library', label: '我的库', icon: Library },
   { id: 'inventory', label: '实体库存', icon: PackageCheck },
   { id: 'graph', label: '关系图谱', icon: Network },
@@ -175,7 +179,6 @@ export default function App() {
       )}
       <header className="topbar">
         <div className="brand">
-          <img className="brand-mark" src="/img.ico" alt="" aria-hidden="true" />
           <div>
             <h1>My ACGN Journey</h1>
             <p>{records.length} 部作品已记录</p>
@@ -208,6 +211,10 @@ export default function App() {
       <main className="workspace">
         {activeTab === 'search' && (
           <SearchPanel hasWork={hasWork} onAddWork={handleAddWork} />
+        )}
+
+        {activeTab === 'trace' && (
+          <TraceMoePanel hasWork={hasWork} onAddWork={handleAddWork} />
         )}
 
         {activeTab === 'library' && (
@@ -244,6 +251,19 @@ export default function App() {
         {activeTab === 'stats' && <StatsPanel records={records} stats={stats} />}
       </main>
 
+      <footer className="site-footer">
+        <a
+          className="repo-link"
+          href="https://github.com/ChibaRie/My_ACGN_Journey"
+          target="_blank"
+          rel="noreferrer"
+        >
+          <Github size={18} aria-hidden="true" />
+          <span>ChibaRie/My_ACGN_Journey</span>
+          <ExternalLink size={15} aria-hidden="true" />
+        </a>
+      </footer>
+
       {settingsOpen && (
         <aside className="settings-popover" role="dialog" aria-labelledby="settings-title">
           <div className="settings-header">
@@ -272,7 +292,7 @@ export default function App() {
             </div>
             <div>
               <dt>搜索来源</dt>
-              <dd>当前为墙内直连优先的单来源检索：萌娘百科、AGE动漫、Bangumi。</dd>
+              <dd>当前为墙内优先的单来源检索：AGE动漫、萌娘百科为直连，Bangumi 标注为需代理。</dd>
             </div>
           </dl>
 

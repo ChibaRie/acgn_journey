@@ -1,6 +1,8 @@
 import { Check, ExternalLink, Plus } from 'lucide-react';
 
 export default function WorkCard({ work, isSaved, onAddWork }) {
+  const displayTags = work.animeTags?.length > 0 ? work.animeTags : work.tags || [];
+
   return (
     <article className="work-card">
       <div className="cover-frame">
@@ -35,9 +37,9 @@ export default function WorkCard({ work, isSaved, onAddWork }) {
           </div>
         )}
 
-        {work.tags?.length > 0 && (
-          <div className="tag-row" aria-label={`${work.title} 标签`}>
-            {work.tags.slice(0, 6).map((tag) => (
+        {displayTags.length > 0 && (
+          <div className="tag-row" aria-label={`${work.title} 动漫标签`}>
+            {displayTags.slice(0, 8).map((tag) => (
               <span key={tag}>{tag}</span>
             ))}
           </div>

@@ -147,7 +147,7 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
                 </div>
                 <div className="tag-row">
                   {record.releaseYear && <span>{record.releaseYear}</span>}
-                  {record.tags.slice(0, 4).map((tag) => (
+                  {(record.tags.length > 0 ? record.tags : record.animeTags || []).slice(0, 4).map((tag) => (
                     <span key={tag}>{tag}</span>
                   ))}
                 </div>

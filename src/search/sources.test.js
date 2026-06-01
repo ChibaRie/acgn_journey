@@ -1,17 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SOURCE_ID, SOURCE_LABELS, SOURCES, buildSourceUrl, getSourceById } from './sources.js';
+import {
+  DEFAULT_SOURCE_ID,
+  SOURCE_LABELS,
+  SOURCES,
+  buildPreferredUrl,
+  buildSourceUrl,
+  getSourceById,
+} from './sources.js';
 
 describe('sources registry', () => {
-  it('exports the browser-readable direct sources first', () => {
+  it('exports sources in mainland-priority order with access labels', () => {
     expect(SOURCES.map((source) => source.id)).toEqual([
-      'moegirl',
       'age',
+      'moegirl',
       'bangumi',
     ]);
+    expect(SOURCES.map((source) => source.accessLabel)).toEqual(['直连', '直连', '需代理']);
   });
 
   it('defaults to the mainland-priority source and returns null for unknown source ids', () => {
-    expect(DEFAULT_SOURCE_ID).toBe('moegirl');
+    expect(DEFAULT_SOURCE_ID).toBe('age');
     expect(getSourceById('evil')).toBeNull();
   });
 
@@ -27,7 +35,16 @@ describe('sources registry', () => {
     expect(() => buildSourceUrl('evil', '/x')).toThrow('未知搜索源');
   });
 
-  it('marks default sources as direct-readable', () => {
+  it('marks retained sources as direct-readable fallbacks', () => {
     expect(SOURCES.every((source) => source.directBase)).toBe(true);
+  });
+
+  it('prefers proxy urls for proxy-marked sources when a proxy base exists', () => {
+    expect(buildPreferredUrl('bangumi', '/v0/search/subjects', 'https://w.example.dev')).toBe(
+      'https://w.example.dev/api/sources/bangumi/v0/search/subjects',
+    );
+    expect(buildPreferredUrl('bangumi', '/v0/search/subjects')).toBe(
+      'https://api.bgm.tv/v0/search/subjects',
+    );
   });
 });

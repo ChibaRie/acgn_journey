@@ -1,25 +1,23 @@
 # 部署指南
 
-本项目部署为 GitHub Pages 静态站。默认搜索源优先浏览器直连；Cloudflare Worker 是非 CORS 友好来源的增强代理，路由变更后需手动部署一次。
+本项目部署为 GitHub Pages 静态站。默认搜索源优先浏览器直连；Cloudflare Worker 只作为已验证来源的可选 fallback，默认搜索不依赖它。
 
-## 一、部署 Cloudflare Worker（搜索代理）
+## 一、可选部署 Cloudflare Worker（搜索代理）
 
-默认可直连来源不依赖 Worker：
+默认可直连来源不依赖 Worker，并按墙内直连优先排序：
 
-- Bangumi 官方 API
 - 萌娘百科 MediaWiki API
 - AGE动漫搜索页
+- Bangumi 官方 API
 
-Worker 只转发以下固定前缀，不接收任意目标 URL：
+Worker 只转发以下仍保留的固定前缀，不接收任意目标 URL：
 
 | 前端路径 | 上游 |
 |---|---|
 | `/api/sources/bangumi/*` | `https://api.bgm.tv/*` |
 | `/api/sources/age/*` | `https://www.agedm.io/*` |
-| `/api/sources/gugu/*` | `https://www.gugu3.com/*` |
-| `/api/sources/girigiri/*` | `http://bgm.girigirilove.com/*` |
-| `/api/sources/douban/*` | `https://m.douban.com/*` |
-| `/api/sources/nyafun/*` | `https://www.nyadm.org/*` |
+
+咕咕番、girigiri愛、豆瓣、NyaFun 已从 active code 和代理白名单中移除；重新接入前需先验证墙内可用性、CORS/代理策略和解析稳定性。
 
 1. 安装 wrangler 并登录（需免费 Cloudflare 账号）：
 
@@ -43,20 +41,22 @@ Worker 只转发以下固定前缀，不接收任意目标 URL：
 
 1. 仓库 Settings → Pages → Build and deployment → Source 选 **GitHub Actions**。
 
-2. 仓库 Settings → Secrets and variables → Actions → **Variables** 标签 → New repository variable：
+2. 不需要配置 `VITE_API_BASE` 也可以正常发布。默认搜索源会直接请求上游。
+
+3. 如果未来启用 Worker fallback，再到仓库 Settings → Secrets and variables → Actions → **Variables** 标签 → New repository variable：
    - Name: `VITE_API_BASE`
-   - Value: 第一步记下的 Worker URL（不带末尾斜杠）
+   - Value: Worker URL（不带末尾斜杠）
 
-3. push 到 `main`（或在 Actions 页手动 Run workflow）触发部署。
+4. push 到 `main`（或在 Actions 页手动 Run workflow）触发部署。
 
-4. 部署完成后访问 `https://chibarie.github.io/My_ACGN_Journey/`。
+5. 部署完成后访问 `https://chibarie.github.io/My_ACGN_Journey/`。
 
 ## 工作原理
 
-- 搜索 UI 是单来源模式：用户先选择 Bangumi、萌娘百科或 AGE动漫，再搜索关键词。
+- 搜索 UI 是单来源模式：用户先选择萌娘百科、AGE动漫或 Bangumi，再搜索关键词。
 - `src/search/adapters/*` 负责按来源构造请求、解析 HTML/JSON，并归一化为 `SearchWork`。
-- **本地开发**：默认来源直接请求上游；代理候选源可由 Vite dev server 代理转发（见 `vite.config.js`）。
-- **生产**：默认来源直接请求上游；若启用代理候选源，构建时注入 `VITE_API_BASE`，请求改打 Cloudflare Worker，由 Worker 转发到固定上游并回填 CORS 头。
+- **本地开发**：默认来源直接请求上游；保留的代理 fallback 可由 Vite dev server 转发（见 `vite.config.js`）。
+- **生产**：默认来源直接请求上游；若未来启用代理 fallback，构建时注入 `VITE_API_BASE`，请求改打 Cloudflare Worker，由 Worker 转发到固定上游并回填 CORS 头。
 - Worker 路由表（`worker/router.js`）与 Vite 代理表结构一致，是白名单封闭代理；其它路径返回 404。
 
 ## 本地开发

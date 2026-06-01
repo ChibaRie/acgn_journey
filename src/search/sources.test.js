@@ -4,14 +4,14 @@ import { DEFAULT_SOURCE_ID, SOURCE_LABELS, SOURCES, buildSourceUrl, getSourceByI
 describe('sources registry', () => {
   it('exports the browser-readable direct sources first', () => {
     expect(SOURCES.map((source) => source.id)).toEqual([
-      'bangumi',
       'moegirl',
       'age',
+      'bangumi',
     ]);
   });
 
-  it('defaults to bangumi and returns null for unknown source ids', () => {
-    expect(DEFAULT_SOURCE_ID).toBe('bangumi');
+  it('defaults to the mainland-priority source and returns null for unknown source ids', () => {
+    expect(DEFAULT_SOURCE_ID).toBe('moegirl');
     expect(getSourceById('evil')).toBeNull();
   });
 
@@ -23,6 +23,7 @@ describe('sources registry', () => {
   it('builds source proxy urls and rejects unknown source ids', () => {
     expect(buildSourceUrl('age', '/search?query=芙莉莲')).toBe('/api/sources/age/search?query=芙莉莲');
     expect(() => buildSourceUrl('moegirl', '/api.php')).toThrow('搜索源不支持代理');
+    expect(() => buildSourceUrl('gugu', '/x')).toThrow('未知搜索源');
     expect(() => buildSourceUrl('evil', '/x')).toThrow('未知搜索源');
   });
 

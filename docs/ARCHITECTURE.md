@@ -19,7 +19,7 @@ My ACGN Journey 是一个个人ACG（动画、轻小说、Galgame）作品记录
 
 **关键设计决策：**
 - 采用原生 CSS Variables 实现暗夜/日间双主题，通过 `data-theme` 属性切换
-- 搜索请求通过 `src/search/` 的来源 adapter 归一化；默认来源直接请求支持 CORS 的上游，非 CORS 友好来源再由 Vite/Worker 白名单代理转发
+- 搜索请求通过 `src/search/` 的来源 adapter 归一化；默认来源直接请求支持 CORS 的上游，废弃或不可稳定直连的来源先从 active code 中移除
 - 所有数据存储在 LocalStorage 单键下，导出为 JSON 备份文件
 - 组件按面板（Panel）拆分，每个面板自包含状态和逻辑
 
@@ -179,21 +179,15 @@ App (状态根)
               │            │            │
           searchSource   filterRecords  getStats
               │            │            │
-        ┌─────▼─────┐     │            │
-        │ Vite Proxy │     │            │
-        │ /api/*     │     │            │
-        └─────┬─────┘     │            │
-              │            │            │
-          Source adapter
-               │
-        /api/sources/<id>
-               │
-        Vite proxy / Worker
+       Source adapter
+              │
+      browser-readable
+        upstream API/page
 ```
 
 ### 4.3 API 集成架构
 
-默认搜索源使用浏览器直连，只有非 CORS 友好来源才通过 Vite Dev Server 或 Cloudflare Worker 转发。前端不会传入任意上游 URL；代理候选源只能访问固定的 `/api/sources/<source>` 前缀。
+默认搜索源使用浏览器直连，按墙内直连优先排序。当前不保留“先藏起来以后再说”的候选源；无法稳定直连或需要额外反爬适配的来源会先从 UI、adapter、测试和代理白名单中删除。
 
 ```
 浏览器 fetch('https://www.agedm.io/search?query=...')
@@ -205,12 +199,12 @@ App (状态根)
 **默认直连来源：**
 
 | 来源 | 上游 | 数据格式 |
-|------|---------|------|----------|
-| Bangumi | `https://api.bgm.tv` | JSON |
+|------|------|------|
 | 萌娘百科 | `https://zh.moegirl.org.cn/api.php?origin=*` | JSON |
 | AGE动漫 | `https://www.agedm.io/search?query=...` | HTML |
+| Bangumi | `https://api.bgm.tv` | JSON |
 
-**代理候选来源：** 咕咕番、girigiri愛、豆瓣、NyaFun。它们需要 Worker/Vite 代理或额外反爬适配，当前不默认展示。
+**已舍弃来源：** 咕咕番、girigiri愛、豆瓣、NyaFun。它们分别存在无 CORS、接口限制、跳转校验或解析稳定性问题，重新接入前必须先完成墙内可用性验证。
 
 **搜索策略：**
 1. UI 只维护一个 `sourceId`，切换来源不会自动发请求
@@ -222,7 +216,7 @@ App (状态根)
 
 ### 5.1 搜索模块 (`src/search/`)
 
-- `sources.js`: 默认直连来源注册表、代理路径构造
+- `sources.js`: 默认直连来源注册表与可选代理 fallback 路径构造
 - `searchService.js`: `searchSource(sourceId, keyword, options)` 单来源入口
 - `html.js`: HTML/BBCode 清洗、URL 修补、年份与标签工具
 - `adapters/*.js`: 每个来源一个 adapter，负责请求和归一化
@@ -298,7 +292,7 @@ My-ACGN-Journey/
     │   ├── sources.js      # 单来源注册表
     │   ├── searchService.js # 单来源搜索入口
     │   ├── html.js         # HTML/URL/标签工具
-    │   └── adapters/       # Bangumi/萌娘百科/AGE + 代理候选 adapters
+    │   └── adapters/       # 萌娘百科/AGE/Bangumi adapters
     ├── hooks/
     │   └── useLibrary.js   # 作品库状态管理 Hook
     ├── utils/

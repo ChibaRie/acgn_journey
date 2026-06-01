@@ -12,7 +12,7 @@ describe('html helpers', () => {
 
   it('normalizes protocol-relative and path-relative urls', () => {
     expect(normalizeUrl('//cdn.example.com/a.jpg')).toBe('https://cdn.example.com/a.jpg');
-    expect(normalizeUrl('/img/a.jpg', 'https://www.gugu3.com')).toBe('https://www.gugu3.com/img/a.jpg');
+    expect(normalizeUrl('/img/a.jpg', 'https://www.agedm.io')).toBe('https://www.agedm.io/img/a.jpg');
   });
 
   it('extracts year from date text', () => {

@@ -2,15 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { corsHeaders, matchRoute, rewritePath } from './router.js';
 
 describe('matchRoute', () => {
-  it('matches the six allowed source prefixes', () => {
+  it('matches the retained allowed source prefixes', () => {
     expect(matchRoute('/api/sources/bangumi/v0/search/subjects').target).toBe('https://api.bgm.tv');
     expect(matchRoute('/api/sources/age/search').target).toBe('https://www.agedm.io');
-    expect(matchRoute('/api/sources/gugu/index.php/vod/search.html').target).toBe('https://www.gugu3.com');
-    expect(matchRoute('/api/sources/girigiri/search/-------------/').target).toBe(
-      'http://bgm.girigirilove.com',
-    );
-    expect(matchRoute('/api/sources/douban/rexxar/api/v2/search').target).toBe('https://m.douban.com');
-    expect(matchRoute('/api/sources/nyafun/search.html').target).toBe('https://www.nyadm.org');
   });
 
   it('returns null for unknown prefixes and sibling prefix confusion', () => {
@@ -19,9 +13,11 @@ describe('matchRoute', () => {
     expect(matchRoute('/api/sources/unknown/search')).toBeNull();
   });
 
-  it('keeps douban referer headers scoped to the douban route', () => {
-    const route = matchRoute('/api/sources/douban/rexxar/api/v2/search');
-    expect(route.headers.Referer).toBe('https://www.douban.com/search');
+  it('rejects discarded source prefixes', () => {
+    expect(matchRoute('/api/sources/gugu/index.php/vod/search.html')).toBeNull();
+    expect(matchRoute('/api/sources/girigiri/search/-------------/')).toBeNull();
+    expect(matchRoute('/api/sources/douban/rexxar/api/v2/search')).toBeNull();
+    expect(matchRoute('/api/sources/nyafun/search.html')).toBeNull();
   });
 });
 

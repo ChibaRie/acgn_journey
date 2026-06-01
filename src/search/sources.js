@@ -1,19 +1,12 @@
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
-export const DEFAULT_SOURCE_ID = 'bangumi';
+export const DEFAULT_SOURCE_ID = 'moegirl';
 
 export const SOURCES = [
   {
-    id: 'bangumi',
-    label: 'Bangumi',
-    description: '官方 API 支持 CORS，可浏览器直连，适合作为基础元数据来源。',
-    directBase: 'https://api.bgm.tv',
-    proxyPrefix: '/api/sources/bangumi',
-  },
-  {
     id: 'moegirl',
     label: '萌娘百科',
-    description: 'MediaWiki API 支持 origin=* 跨域参数，墙内直连可读。',
+    description: 'MediaWiki API 支持 origin=* 跨域参数，墙内直连优先。',
     directBase: 'https://zh.moegirl.org.cn',
   },
   {
@@ -23,32 +16,12 @@ export const SOURCES = [
     directBase: 'https://www.agedm.io',
     proxyPrefix: '/api/sources/age',
   },
-];
-
-export const PROXY_CANDIDATE_SOURCES = [
   {
-    id: 'gugu',
-    label: '咕咕番',
-    description: '动画资源站，页面无 CORS，需代理后启用。',
-    proxyPrefix: '/api/sources/gugu',
-  },
-  {
-    id: 'girigiri',
-    label: 'girigiri愛',
-    description: '动画资源站，页面无 CORS，需代理后启用。',
-    proxyPrefix: '/api/sources/girigiri',
-  },
-  {
-    id: 'douban',
-    label: '豆瓣',
-    description: '中文标题、年份、评分和简介的补充来源，需代理后启用。',
-    proxyPrefix: '/api/sources/douban',
-  },
-  {
-    id: 'nyafun',
-    label: 'NyaFun',
-    description: '动画资源站，当前存在跳转校验，需代理和解析适配后启用。',
-    proxyPrefix: '/api/sources/nyafun',
+    id: 'bangumi',
+    label: 'Bangumi',
+    description: '官方 API 支持 CORS，可浏览器直连，适合作为基础元数据来源。',
+    directBase: 'https://api.bgm.tv',
+    proxyPrefix: '/api/sources/bangumi',
   },
 ];
 
@@ -63,7 +36,7 @@ export function buildApiUrl(path, base = API_BASE) {
 }
 
 export function buildSourceUrl(sourceId, upstreamPath, base = API_BASE) {
-  const source = [...SOURCES, ...PROXY_CANDIDATE_SOURCES].find((source) => source.id === sourceId) || null;
+  const source = getSourceById(sourceId);
   if (!source) {
     throw new Error(`未知搜索源：${sourceId}`);
   }

@@ -10,11 +10,11 @@ import {
 
 describe('search api compatibility exports', () => {
   it('re-exports the single-source registry', () => {
-    expect(DEFAULT_SOURCE_ID).toBe('bangumi');
+    expect(DEFAULT_SOURCE_ID).toBe('moegirl');
     expect(SOURCES.map((source) => source.id)).toEqual([
-      'bangumi',
       'moegirl',
       'age',
+      'bangumi',
     ]);
     expect(getSourceById('nyafun')).toBeNull();
   });
@@ -26,13 +26,12 @@ describe('search api compatibility exports', () => {
     );
   });
 
-  it('builds source proxy urls from source ids', () => {
-    expect(buildSourceUrl('gugu', '/index.php/vod/search.html?wd=x')).toBe(
-      '/api/sources/gugu/index.php/vod/search.html?wd=x',
-    );
+  it('builds source proxy urls only for retained proxy routes', () => {
+    expect(buildSourceUrl('age', '/search?query=x')).toBe('/api/sources/age/search?query=x');
+    expect(() => buildSourceUrl('gugu', '/index.php/vod/search.html?wd=x')).toThrow('未知搜索源');
   });
 
   it('re-exports the single-source search function', async () => {
-    await expect(searchSource('bangumi', '')).resolves.toEqual({ items: [], error: null });
+    await expect(searchSource('moegirl', '')).resolves.toEqual({ items: [], error: null });
   });
 });

@@ -31,38 +31,6 @@ export default defineConfig({
         headers: browserLikeHeaders,
         rewrite: (path) => path.replace(/^\/api\/sources\/age/, ''),
       },
-      '/api/sources/gugu': {
-        target: 'https://www.gugu3.com',
-        changeOrigin: true,
-        secure: true,
-        headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/sources\/gugu/, ''),
-      },
-      '/api/sources/girigiri': {
-        target: 'http://bgm.girigirilove.com',
-        changeOrigin: true,
-        secure: false,
-        headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/sources\/girigiri/, ''),
-      },
-      '/api/sources/douban': {
-        target: 'https://m.douban.com',
-        changeOrigin: true,
-        secure: true,
-        headers: {
-          ...browserLikeHeaders,
-          Referer: 'https://www.douban.com/search',
-          Accept: 'application/json,text/plain,*/*',
-        },
-        rewrite: (path) => path.replace(/^\/api\/sources\/douban/, ''),
-      },
-      '/api/sources/nyafun': {
-        target: 'https://www.nyadm.org',
-        changeOrigin: true,
-        secure: true,
-        headers: browserLikeHeaders,
-        rewrite: (path) => path.replace(/^\/api\/sources\/nyafun/, ''),
-      },
     },
   },
 });

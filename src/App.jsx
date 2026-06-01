@@ -8,7 +8,6 @@ import {
   Image as ImageIcon,
   Library,
   Moon,
-  Network,
   PackageCheck,
   Search,
   Settings2,
@@ -23,7 +22,6 @@ import LibraryPanel from './components/LibraryPanel.jsx';
 import TimelinePanel from './components/TimelinePanel.jsx';
 import StatsPanel from './components/StatsPanel.jsx';
 import InventoryPanel from './components/InventoryPanel.jsx';
-import RelationGraphPanel from './components/RelationGraphPanel.jsx';
 import BulkImportPanel from './components/BulkImportPanel.jsx';
 import RecordEditor from './components/RecordEditor.jsx';
 import { useLibrary } from './hooks/useLibrary.js';
@@ -32,21 +30,23 @@ import { getStats } from './utils/stats.js';
 import { createBackup, getDoneLabel, readBackup } from './utils/library.js';
 import { readImageFile } from './utils/background.js';
 
-const THEME_KEY = 'my-acgn-journey:theme';
+const THEME_KEY = 'acgn_journey:theme';
+const LEGACY_THEME_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:theme`];
 
 const TABS = [
   { id: 'search', label: '搜索', icon: Search },
   { id: 'trace', label: '截图识别', icon: ImageIcon },
   { id: 'library', label: '我的库', icon: Library },
   { id: 'inventory', label: '实体库存', icon: PackageCheck },
-  { id: 'graph', label: '关系图谱', icon: Network },
   { id: 'import', label: '批量导入', icon: UploadCloud },
   { id: 'timeline', label: '历程', icon: Clock3 },
   { id: 'stats', label: '统计', icon: BarChart3 },
 ];
 
 function getInitialTheme() {
-  const savedTheme = localStorage.getItem(THEME_KEY);
+  const savedTheme =
+    localStorage.getItem(THEME_KEY) ||
+    LEGACY_THEME_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
   if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
@@ -59,8 +59,17 @@ export default function App() {
   const [toast, setToast] = useState('');
   const fileInputRef = useRef(null);
   const bgInputRef = useRef(null);
-  const { records, addWork, updateRecord, deleteRecord, replaceRecords, mergeRecords, hasWork } =
-    useLibrary();
+  const {
+    records,
+    addWork,
+    updateRecord,
+    deleteRecord,
+    bulkUpdateRecords,
+    deleteRecords,
+    replaceRecords,
+    mergeRecords,
+    hasWork,
+  } = useLibrary();
   const { background, setImage, setOpacity, setBlur, clearImage } = useBackground();
   const stats = useMemo(() => getStats(records), [records]);
   const isDark = theme === 'dark';
@@ -102,6 +111,16 @@ export default function App() {
     showToast('记录已删除');
   };
 
+  const handleBulkUpdateRecords = (ids, patch) => {
+    bulkUpdateRecords(ids, patch);
+    showToast(`已更新 ${ids.length} 条记录`);
+  };
+
+  const handleDeleteRecords = (ids) => {
+    deleteRecords(ids);
+    showToast(`已删除 ${ids.length} 条记录`);
+  };
+
   const handleMergeImport = (nextRecords) => {
     mergeRecords(nextRecords);
     showToast(`已合并导入 ${nextRecords.length} 条记录`);
@@ -118,7 +137,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `my-acgn-journey-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `acgn_journey-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -180,7 +199,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <div>
-            <h1>My ACGN Journey</h1>
+            <h1>acgn_journey</h1>
             <p>{records.length} 部作品已记录</p>
           </div>
         </div>
@@ -222,6 +241,8 @@ export default function App() {
             records={records}
             onEditRecord={setEditingRecord}
             onDeleteRecord={handleDeleteRecord}
+            onBulkUpdateRecords={handleBulkUpdateRecords}
+            onDeleteRecords={handleDeleteRecords}
           />
         )}
 
@@ -231,10 +252,6 @@ export default function App() {
             onEditRecord={setEditingRecord}
             onUpdateRecord={updateRecord}
           />
-        )}
-
-        {activeTab === 'graph' && (
-          <RelationGraphPanel records={records} onUpdateRecord={updateRecord} />
         )}
 
         {activeTab === 'import' && (
@@ -254,12 +271,12 @@ export default function App() {
       <footer className="site-footer">
         <a
           className="repo-link"
-          href="https://github.com/ChibaRie/My_ACGN_Journey"
+          href="https://github.com/ChibaRie/acgn_journey"
           target="_blank"
           rel="noreferrer"
         >
           <Github size={18} aria-hidden="true" />
-          <span>ChibaRie/My_ACGN_Journey</span>
+          <span>ChibaRie/acgn_journey</span>
           <ExternalLink size={15} aria-hidden="true" />
         </a>
       </footer>

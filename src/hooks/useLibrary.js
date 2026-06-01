@@ -18,6 +18,14 @@ export function useLibrary() {
 
   const hasWork = (work) => workKeys.has(getWorkKey(work));
 
+  const applyPatchToRecord = (record, patch) =>
+    normalizeRecord({
+      ...record,
+      ...patch,
+      rating: patch.rating === undefined ? record.rating ?? 0 : Number(patch.rating),
+      updatedAt: new Date().toISOString(),
+    });
+
   const addWork = (work) => {
     const key = getWorkKey(work);
     const existing = records.find((record) => record.workKey === key);
@@ -30,30 +38,28 @@ export function useLibrary() {
 
   const updateRecord = (id, patch) => {
     setRecords((current) =>
-      current.map((record) =>
-        record.id === id
-          ? normalizeRecord({
-              ...record,
-              ...patch,
-              rating: Number(patch.rating ?? record.rating ?? 0),
-              updatedAt: new Date().toISOString(),
-            })
-          : record,
-      ),
+      current.map((record) => (record.id === id ? applyPatchToRecord(record, patch) : record)),
     );
   };
 
   const deleteRecord = (id) => {
+    setRecords((current) => current.filter((record) => record.id !== id));
+  };
+
+  const bulkUpdateRecords = (ids, patch) => {
+    const idSet = new Set((ids || []).filter(Boolean));
+    if (idSet.size === 0) return;
+
     setRecords((current) =>
-      current
-        .filter((record) => record.id !== id)
-        .map((record) =>
-          normalizeRecord({
-            ...record,
-            relations: (record.relations || []).filter((relation) => relation.targetId !== id),
-          }),
-        ),
+      current.map((record) => (idSet.has(record.id) ? applyPatchToRecord(record, patch) : record)),
     );
+  };
+
+  const deleteRecords = (ids) => {
+    const idSet = new Set((ids || []).filter(Boolean));
+    if (idSet.size === 0) return;
+
+    setRecords((current) => current.filter((record) => !idSet.has(record.id)));
   };
 
   const replaceRecords = (nextRecords) => {
@@ -75,6 +81,8 @@ export function useLibrary() {
     addWork,
     updateRecord,
     deleteRecord,
+    bulkUpdateRecords,
+    deleteRecords,
     replaceRecords,
     mergeRecords,
     hasWork,

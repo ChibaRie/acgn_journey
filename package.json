@@ -1,6 +1,6 @@
 {
-  "name": "my-acgn-journey",
-  "version": "0.5.2",
+  "name": "acgn_journey",
+  "version": "0.5.4",
   "private": true,
   "license": "MIT",
   "type": "module",

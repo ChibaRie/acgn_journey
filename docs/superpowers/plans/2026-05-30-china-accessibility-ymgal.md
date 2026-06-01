@@ -32,7 +32,7 @@
 - [ ] **Step 1: 从最新 main 建分支**
 
 ```bash
-cd "C:/Users/14507/Desktop/My-ACGN-Journey"
+cd "C:/Users/14507/Desktop/acgn_journey"
 git checkout main && git pull origin main
 git checkout -b feat/china-accessibility-ymgal
 ```

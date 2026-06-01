@@ -1,4 +1,10 @@
-import { getRecordYear, getStatusLabel, getWorkCategory, getWorkYear } from './library.js';
+import {
+  getRecordYear,
+  getStatusLabel,
+  getWorkCategory,
+  getWorkYear,
+  normalizeTags,
+} from './library.js';
 
 function countBy(items, getKey) {
   return items.reduce((acc, item) => {
@@ -18,6 +24,24 @@ function toSeries(map) {
     });
 }
 
+export function getTagSeries(records, limit = 60) {
+  const counts = new Map();
+
+  for (const record of records) {
+    const tags = normalizeTags([...(record.tags || []), ...(record.animeTags || [])]);
+    for (const tag of new Set(tags)) {
+      counts.set(tag, (counts.get(tag) || 0) + 1);
+    }
+  }
+
+  return Array.from(counts, ([label, value]) => ({ label, value }))
+    .sort((a, b) => {
+      if (b.value !== a.value) return b.value - a.value;
+      return a.label.localeCompare(b.label, 'zh-Hans-CN', { numeric: true });
+    })
+    .slice(0, limit);
+}
+
 export function getStats(records) {
   const ratedRecords = records.filter((record) => Number(record.rating) > 0);
   const doneCount = records.filter((record) => record.status === 'done').length;
@@ -33,6 +57,7 @@ export function getStats(records) {
     ),
     yearSeries: toSeries(countBy(records, getRecordYear)),
     workYearSeries: toSeries(countBy(records, getWorkYear)),
+    tagSeries: getTagSeries(records),
     ratingSeries: Array.from({ length: 10 }, (_, index) => {
       const score = index + 1;
       return {

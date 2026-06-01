@@ -1,4 +1,5 @@
-import { BarChart3, CheckCircle2, Library, Star } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { CheckCircle2, Library, Star, Tags } from 'lucide-react';
 import EmptyState from './EmptyState.jsx';
 
 function BarList({ title, items }) {
@@ -21,6 +22,87 @@ function BarList({ title, items }) {
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function collectRecordTags(record) {
+  return Array.from(
+    new Set(
+      [...(record.tags || []), ...(record.animeTags || [])]
+        .map((tag) => String(tag).trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function TagCloud({ items, records }) {
+  const [selectedTag, setSelectedTag] = useState('');
+  const max = Math.max(...items.map((item) => item.value), 1);
+  const min = Math.min(...items.map((item) => item.value), max);
+  const span = Math.max(max - min, 1);
+
+  const selectedRecords = useMemo(() => {
+    if (!selectedTag) return [];
+    return records
+      .filter((record) => collectRecordTags(record).includes(selectedTag))
+      .slice(0, 8);
+  }, [records, selectedTag]);
+
+  return (
+    <section className="stat-section tag-cloud-section" aria-label="标签词云">
+      <div className="tag-cloud-heading">
+        <div>
+          <h3>标签词云</h3>
+          <p className="muted-text">来自用户标签与来源解析出的动漫标签，点击词条可查看关联作品。</p>
+        </div>
+        <span>{items.length} 个标签</span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="muted-text">暂无标签数据</p>
+      ) : (
+        <>
+          <div className="tag-cloud" role="list" aria-label="作品标签词云">
+            {items.map((item, index) => {
+              const weight = (item.value - min) / span;
+              const size = 0.92 + weight * 0.9 + Math.min(item.value, 8) * 0.03;
+              const active = selectedTag === item.label;
+              return (
+                <button
+                  key={item.label}
+                  className={`cloud-word tone-${index % 5}${active ? ' active' : ''}`}
+                  type="button"
+                  style={{ '--tag-size': `${size.toFixed(2)}rem`, '--tag-weight': weight }}
+                  title={`${item.label}：${item.value} 部作品`}
+                  aria-pressed={active}
+                  onClick={() => setSelectedTag(active ? '' : item.label)}
+                >
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="tag-cloud-detail" aria-live="polite">
+            {selectedTag ? (
+              <>
+                <p>
+                  <strong>{selectedTag}</strong> 关联 {selectedRecords.length} 部作品
+                </p>
+                <div className="tag-cloud-records">
+                  {selectedRecords.map((record) => (
+                    <span key={record.id}>{record.title}</span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p>选择一个标签，看看它对应了哪些收藏。</p>
+            )}
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -66,11 +148,13 @@ export default function StatsPanel({ records, stats }) {
           <strong>{stats.averageRating || '--'}</strong>
         </article>
         <article className="stat-card accent-indigo">
-          <BarChart3 size={20} />
-          <span>类型数量</span>
-          <strong>{stats.typeSeries.length}</strong>
+          <Tags size={20} />
+          <span>标签数量</span>
+          <strong>{stats.tagSeries?.length || 0}</strong>
         </article>
       </div>
+
+      <TagCloud items={stats.tagSeries || []} records={records} />
 
       <div className="stats-grid">
         <BarList title="类型分布" items={stats.typeSeries} />

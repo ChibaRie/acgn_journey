@@ -1,8 +1,13 @@
 export const ROUTES = {
+  '/api/bangumi': {
+    target: 'https://api.bgm.tv',
+    headers: { 'User-Agent': 'acgn_journey/0.5.4 (https://github.com/ChibaRie/acgn_journey)' },
+  },
   '/api/sources/bangumi': {
     target: 'https://api.bgm.tv',
-    headers: { 'User-Agent': 'MyACGNJourney/0.3 (https://github.com/ChibaRie/My_ACGN_Journey)' },
+    headers: { 'User-Agent': 'acgn_journey/0.5.4 (https://github.com/ChibaRie/acgn_journey)' },
   },
+  '/api/age': { target: 'https://www.agedm.io', headers: {} },
   '/api/sources/age': { target: 'https://www.agedm.io', headers: {} },
 };
 

@@ -27,7 +27,7 @@ export const SOURCES = [
     accessKind: 'proxy',
     description: '条目元数据较完整；墙内访问建议配置代理，未配置时会尝试官方 API 直连。',
     directBase: 'https://api.bgm.tv',
-    proxyPrefix: '/api/sources/bangumi',
+    proxyPrefix: '/api/bangumi',
     proxyPreferred: true,
   },
 ];

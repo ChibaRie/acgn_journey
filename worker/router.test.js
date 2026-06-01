@@ -3,7 +3,9 @@ import { corsHeaders, matchRoute, rewritePath } from './router.js';
 
 describe('matchRoute', () => {
   it('matches the retained allowed source prefixes', () => {
+    expect(matchRoute('/api/bangumi/v0/search/subjects').target).toBe('https://api.bgm.tv');
     expect(matchRoute('/api/sources/bangumi/v0/search/subjects').target).toBe('https://api.bgm.tv');
+    expect(matchRoute('/api/age/search').target).toBe('https://www.agedm.io');
     expect(matchRoute('/api/sources/age/search').target).toBe('https://www.agedm.io');
   });
 
@@ -23,6 +25,9 @@ describe('matchRoute', () => {
 
 describe('rewritePath', () => {
   it('strips the source prefix and keeps the remainder', () => {
+    expect(rewritePath('/api/bangumi', '/api/bangumi/v0/search/subjects')).toBe(
+      '/v0/search/subjects',
+    );
     expect(rewritePath('/api/sources/bangumi', '/api/sources/bangumi/v0/search/subjects')).toBe(
       '/v0/search/subjects',
     );

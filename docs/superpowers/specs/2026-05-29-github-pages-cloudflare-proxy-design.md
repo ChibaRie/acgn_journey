@@ -5,7 +5,7 @@
 
 ## 1. 目标
 
-将 My ACGN Journey 部署到 GitHub Pages，让他人可访问；并用 Cloudflare Worker 做 serverless 代理，使线上版本的多源搜索（5 个源）正常工作。同时更新 README。
+将 acgn_journey 部署到 GitHub Pages，让他人可访问；并用 Cloudflare Worker 做 serverless 代理，使线上版本的多源搜索（5 个源）正常工作。同时更新 README。
 
 ## 2. 背景与约束
 
@@ -49,7 +49,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || '';
 路由表（与 vite.config.js proxy 同构）：
 ```js
 const ROUTES = {
-  '/api/bangumi':  { target: 'https://api.bgm.tv',         headers: { 'User-Agent': 'MyACGNJourney/0.3 (https://github.com/ChibaRie/My_ACGN_Journey)' } },
+  '/api/bangumi':  { target: 'https://api.bgm.tv',         headers: { 'User-Agent': 'acgn_journey/0.3 (https://github.com/ChibaRie/acgn_journey)' } },
   '/api/bilibili': { target: 'https://api.bilibili.com',   headers: { Referer: 'https://www.bilibili.com/', Origin: 'https://www.bilibili.com' } },
   '/api/moegirl':  { target: 'https://zh.moegirl.org.cn',  headers: {} },
   '/api/anilist':  { target: 'https://graphql.anilist.co', headers: {} },
@@ -86,7 +86,7 @@ const CORS = {
 
 (a) `vite.config.js` base：
 ```js
-base: process.env.GITHUB_ACTIONS ? '/My_ACGN_Journey/' : '/',
+base: process.env.GITHUB_ACTIONS ? '/acgn_journey/' : '/',
 ```
 dev 用 `/`，仅 CI 用子路径（项目页地址带仓库名）。
 

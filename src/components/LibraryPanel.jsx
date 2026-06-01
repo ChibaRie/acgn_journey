@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Edit3, Filter, Star, Tag, Trash2 } from 'lucide-react';
+import { CheckSquare, Edit3, Filter, Square, Star, Tag, Trash2, X } from 'lucide-react';
 import EmptyState from './EmptyState.jsx';
 import {
   STATUS_OPTIONS,
@@ -10,14 +10,28 @@ import {
 } from '../utils/library.js';
 import { filterRecords } from '../utils/stats.js';
 
-export default function LibraryPanel({ records, onEditRecord, onDeleteRecord }) {
+export default function LibraryPanel({
+  records,
+  onEditRecord,
+  onDeleteRecord,
+  onBulkUpdateRecords,
+  onDeleteRecords,
+}) {
   const [filters, setFilters] = useState({
     keyword: '',
     category: 'all',
     workYear: 'all',
     status: '',
   });
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState('');
   const filteredRecords = useMemo(() => filterRecords(records, filters), [records, filters]);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const visibleRecordIds = useMemo(() => filteredRecords.map((record) => record.id), [filteredRecords]);
+  const selectedVisibleCount = visibleRecordIds.filter((id) => selectedIdSet.has(id)).length;
+  const allVisibleSelected = visibleRecordIds.length > 0 && selectedVisibleCount === visibleRecordIds.length;
+  const selectedCount = selectedIds.length;
 
   const categoryCounts = useMemo(
     () =>
@@ -54,6 +68,49 @@ export default function LibraryPanel({ records, onEditRecord, onDeleteRecord }) 
     setFilters((current) => ({ ...current, [key]: value }));
   };
 
+  const toggleBulkMode = () => {
+    setBulkMode((current) => {
+      if (current) {
+        setSelectedIds([]);
+        setBulkStatus('');
+      }
+      return !current;
+    });
+  };
+
+  const toggleRecordSelection = (id) => {
+    setSelectedIds((current) =>
+      current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id],
+    );
+  };
+
+  const toggleVisibleSelection = () => {
+    setSelectedIds((current) => {
+      const currentSet = new Set(current);
+      if (allVisibleSelected) {
+        return current.filter((id) => !visibleRecordIds.includes(id));
+      }
+      visibleRecordIds.forEach((id) => currentSet.add(id));
+      return Array.from(currentSet);
+    });
+  };
+
+  const handleApplyStatus = () => {
+    if (!bulkStatus || selectedCount === 0) return;
+    onBulkUpdateRecords(selectedIds, { status: bulkStatus });
+    setSelectedIds([]);
+    setBulkStatus('');
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedCount === 0) return;
+    const confirmed = window.confirm(`删除选中的 ${selectedCount} 条记录？`);
+    if (!confirmed) return;
+    onDeleteRecords(selectedIds);
+    setSelectedIds([]);
+    setBulkStatus('');
+  };
+
   const confirmDelete = (record) => {
     if (window.confirm(`删除《${record.title}》这条记录？`)) {
       onDeleteRecord(record.id);
@@ -71,6 +128,68 @@ export default function LibraryPanel({ records, onEditRecord, onDeleteRecord }) 
           {filteredRecords.length} / {records.length}
         </div>
       </div>
+
+      {records.length > 0 && (
+        <div className="bulk-toolbar" aria-label="批量管理">
+          <button
+            className={bulkMode ? 'button secondary active' : 'button secondary'}
+            type="button"
+            onClick={toggleBulkMode}
+            aria-pressed={bulkMode}
+          >
+            {bulkMode ? <X size={16} /> : <CheckSquare size={16} />}
+            <span>{bulkMode ? '退出批量管理' : '批量管理'}</span>
+          </button>
+
+          {bulkMode && (
+            <>
+              <button
+                className="button secondary"
+                type="button"
+                onClick={toggleVisibleSelection}
+                disabled={visibleRecordIds.length === 0}
+              >
+                {allVisibleSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                <span>{allVisibleSelected ? '取消当前筛选' : '选择当前筛选'}</span>
+              </button>
+
+              <div className="bulk-actions">
+                <span className="bulk-count">{selectedCount} 项已选</span>
+                <select
+                  value={bulkStatus}
+                  onChange={(event) => setBulkStatus(event.target.value)}
+                  disabled={selectedCount === 0}
+                  aria-label="批量修改状态"
+                >
+                  <option value="">修改状态</option>
+                  {STATUS_OPTIONS.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.defaultLabel}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={handleApplyStatus}
+                  disabled={!bulkStatus || selectedCount === 0}
+                >
+                  <span>应用</span>
+                </button>
+                <button
+                  className="button danger"
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={selectedCount === 0}
+                >
+                  <Trash2 size={16} />
+                  <span>删除</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="category-row" aria-label="作品分类">
         {categoryCounts.map((category) => (
@@ -138,8 +257,30 @@ export default function LibraryPanel({ records, onEditRecord, onDeleteRecord }) 
       <div className="library-list">
         {filteredRecords.map((record) => {
           const displayTags = record.tags.length > 0 ? record.tags : record.animeTags || [];
+          const isSelected = selectedIdSet.has(record.id);
           return (
-            <article className="library-item" key={record.id}>
+            <article
+              className={
+                bulkMode
+                  ? isSelected
+                    ? 'library-item bulk-select selected'
+                    : 'library-item bulk-select'
+                  : isSelected
+                    ? 'library-item selected'
+                    : 'library-item'
+              }
+              key={record.id}
+            >
+              {bulkMode && (
+                <label className="library-select">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleRecordSelection(record.id)}
+                  />
+                  <span className="sr-only">选择 {record.title}</span>
+                </label>
+              )}
               <div className="mini-cover">
                 {record.cover ? (
                   <img

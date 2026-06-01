@@ -1,5 +1,6 @@
-export const STORAGE_KEY = 'my-acgn-journey:records:v1';
-export const BACKUP_VERSION = '0.2';
+export const STORAGE_KEY = 'acgn_journey:records:v1';
+const LEGACY_STORAGE_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:records:v1`];
+export const BACKUP_VERSION = '0.5.4';
 
 export const STATUS_OPTIONS = [
   { value: 'wish', defaultLabel: '想看', anime: '想看', book: '想读', game: '想玩' },
@@ -31,15 +32,6 @@ export const OPEN_STATUS_OPTIONS = [
   { value: 'unknown', label: '未记录' },
   { value: 'sealed', label: '未拆封' },
   { value: 'opened', label: '已开封' },
-];
-
-export const RELATION_TYPES = [
-  { value: 'series', label: '系列作品' },
-  { value: 'same_world', label: '同一世界观' },
-  { value: 'same_creator', label: '同一作者/会社' },
-  { value: 'adaptation', label: '改编关系' },
-  { value: 'spinoff', label: '衍生作品' },
-  { value: 'other', label: '其他关联' },
 ];
 
 export const DEFAULT_INVENTORY = {
@@ -154,10 +146,6 @@ export function getOpenStatusLabel(status) {
   return OPEN_STATUS_OPTIONS.find((item) => item.value === status)?.label || '未记录';
 }
 
-export function getRelationTypeLabel(type) {
-  return RELATION_TYPES.find((item) => item.value === type)?.label || '其他关联';
-}
-
 export function getYearFromDate(value) {
   if (!value) return '';
   const match = String(value).match(/\b(19|20)\d{2}\b/);
@@ -212,7 +200,6 @@ export function createRecordFromWork(work, overrides = {}) {
       : normalizeTags(work.tags || []),
     animeTags: normalizeTags(overrides.animeTags || work.animeTags || []),
     inventory: normalizeInventory(overrides.inventory),
-    relations: normalizeRelations(overrides.relations),
     startedAt: overrides.startedAt || '',
     finishedAt: overrides.finishedAt || today,
     addedAt: now,
@@ -222,7 +209,9 @@ export function createRecordFromWork(work, overrides = {}) {
 
 export function loadRecords() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ||
+      LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -262,55 +251,34 @@ export function normalizeInventory(value = {}) {
   };
 }
 
-export function normalizeRelations(value = []) {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((relation) => {
-      const targetId = String(relation?.targetId || '').trim();
-      if (!targetId) return null;
-      const type = RELATION_TYPES.some((item) => item.value === relation?.type)
-        ? relation.type
-        : 'other';
-      return {
-        id: relation?.id || createId(),
-        targetId,
-        type,
-        note: String(relation?.note || '').trim(),
-      };
-    })
-    .filter(Boolean);
-}
-
 export function normalizeRecord(record) {
   const now = new Date().toISOString();
+  const baseRecord = record || {};
   const normalized = {
-    ...record,
-    id: record.id || createId(),
+    id: baseRecord.id || createId(),
     workKey:
-      record.workKey ||
-      `${record.source || 'manual'}:${record.sourceId || record.title || createId()}`.toLowerCase(),
-    source: record.source || 'manual',
-    sourceId: record.sourceId || '',
-    sourceUrl: record.sourceUrl || '',
-    title: record.title || '未命名作品',
-    originalTitle: record.originalTitle || '',
-    cover: record.cover || '',
-    type: record.type || '未分类',
-    summary: record.summary || '',
-    releaseDate: record.releaseDate || '',
-    releaseYear: String(record.releaseYear || getYearFromDate(record.releaseDate) || '').trim(),
-    status: record.status || 'done',
-    rating: Number(record.rating || 0),
-    comment: record.comment || '',
-    tags: normalizeTags(record.tags || []),
-    animeTags: normalizeTags(record.animeTags || []),
-    inventory: normalizeInventory(record.inventory),
-    relations: normalizeRelations(record.relations),
-    startedAt: record.startedAt || '',
-    finishedAt: record.finishedAt || '',
-    addedAt: record.addedAt || now,
-    updatedAt: record.updatedAt || now,
+      baseRecord.workKey ||
+      `${baseRecord.source || 'manual'}:${baseRecord.sourceId || baseRecord.title || createId()}`.toLowerCase(),
+    source: baseRecord.source || 'manual',
+    sourceId: baseRecord.sourceId || '',
+    sourceUrl: baseRecord.sourceUrl || '',
+    title: baseRecord.title || '未命名作品',
+    originalTitle: baseRecord.originalTitle || '',
+    cover: baseRecord.cover || '',
+    type: baseRecord.type || '未分类',
+    summary: baseRecord.summary || '',
+    releaseDate: baseRecord.releaseDate || '',
+    releaseYear: String(baseRecord.releaseYear || getYearFromDate(baseRecord.releaseDate) || '').trim(),
+    status: baseRecord.status || 'done',
+    rating: Number(baseRecord.rating || 0),
+    comment: baseRecord.comment || '',
+    tags: normalizeTags(baseRecord.tags || []),
+    animeTags: normalizeTags(baseRecord.animeTags || []),
+    inventory: normalizeInventory(baseRecord.inventory),
+    startedAt: baseRecord.startedAt || '',
+    finishedAt: baseRecord.finishedAt || '',
+    addedAt: baseRecord.addedAt || now,
+    updatedAt: baseRecord.updatedAt || now,
   };
   normalized.releaseYear = normalized.releaseYear || getYearFromDate(normalized.releaseDate);
   return normalized;
@@ -318,7 +286,7 @@ export function normalizeRecord(record) {
 
 export function createBackup(records) {
   return {
-    app: 'My ACGN Journey',
+    app: 'acgn_journey',
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     recordCount: records.length,

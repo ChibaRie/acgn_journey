@@ -1,8 +1,8 @@
-# My ACGN Journey — 系统架构设计文档
+# acgn_journey — 系统架构设计文档
 
 ## 1. 项目概述
 
-My ACGN Journey 是一个个人ACG（动画、轻小说、Galgame）作品记录管理单页应用。用户可按单来源检索作品信息、将作品加入个人库、追踪观看/阅读/游玩进度、记录评分短评、管理实体藏品、构建作品关系图谱，并通过时间线和统计面板回顾个人历程。
+acgn_journey 是一个个人ACG（动画、轻小说、Galgame）作品记录管理单页应用。用户可按单来源检索作品信息、将作品加入个人库、追踪观看/阅读/游玩进度、记录评分短评、管理实体藏品，并通过时间线和统计面板回顾个人历程。
 
 ## 2. 技术选型与架构决策
 
@@ -62,7 +62,6 @@ interface LibraryRecord {
 
   // 扩展模块
   inventory: Inventory;    // 实体藏品信息
-  relations: Relation[];   // 作品关系
 }
 
 interface Inventory {
@@ -77,12 +76,6 @@ interface Inventory {
   notes: string;
 }
 
-interface Relation {
-  id: string;
-  targetId: string;        // 关联作品ID
-  type: 'series' | 'same_world' | 'same_creator' | 'adaptation' | 'spinoff' | 'other';
-  note: string;
-}
 ```
 
 ### 3.2 搜索临时实体：SearchWork
@@ -128,7 +121,7 @@ wish (想看) → active (在看) → done (已看)
 App (状态根)
 ├── Topbar
 │   ├── Brand (标题 + 统计概览)
-│   ├── TabBar (8个标签页切换)
+│   ├── TabBar (7个标签页切换)
 │   └── TopbarMeta (总览数字)
 ├── Workspace (主内容区)
 │   ├── SearchPanel
@@ -143,14 +136,14 @@ App (状态根)
 │   │   ├── CategoryRow (分类筛选chip)
 │   │   ├── YearCategoryRow (作品年份筛选chip)
 │   │   ├── FilterRow (关键词+状态筛选)
+│   │   ├── BulkToolbar (批量选择/状态修改/删除)
 │   │   ├── EmptyState
 │   │   └── LibraryList
-│   │       └── LibraryItem[] (库记录列表)
+│   │       └── LibraryItem[] (库记录列表，支持批量勾选)
 │   ├── InventoryPanel (实体库存)
-│   ├── RelationGraphPanel (关系图谱)
 │   ├── BulkImportPanel (批量导入)
 │   ├── TimelinePanel (时间线)
-│   └── StatsPanel (统计面板)
+│   └── StatsPanel (统计面板 + 标签词云)
 ├── Footer (GitHub 仓库链接)
 ├── RecordEditor (编辑弹窗，模态)
 ├── SettingsPopover (设置面板)
@@ -190,7 +183,7 @@ App (状态根)
 
 ### 4.3 API 集成架构
 
-默认文字搜索源按 AGE动漫、萌娘百科、Bangumi 排序。AGE动漫和萌娘百科标注为直连；Bangumi 在 UI 中标注为需代理，但代码保留官方 API 直连 fallback，避免未配置 Worker 的环境彻底不可用。当前不保留“先藏起来以后再说”的候选源；无法稳定直连或需要额外反爬适配的来源会先从 UI、adapter、测试和代理白名单中删除。
+默认文字搜索源按 AGE动漫、萌娘百科、Bangumi 排序。AGE动漫和萌娘百科标注为直连；Bangumi 在 UI 中标注为需代理，但代码保留官方 API 直连 fallback，避免未配置 Worker 的环境彻底不可用；配置 `VITE_API_BASE` 时优先使用当前线上 Worker 已部署的 `/api/bangumi/*`。当前不保留“先藏起来以后再说”的候选源；无法稳定直连或需要额外反爬适配的来源会先从 UI、adapter、测试和代理白名单中删除。
 
 ```
 浏览器 fetch('https://www.agedm.io/search?query=...')
@@ -215,6 +208,7 @@ App (状态根)
 2. `searchSource(sourceId, keyword)` 校验来源并调度对应 adapter
 3. Adapter 负责拼 URL、请求、解析 HTML/JSON，并转换为统一的 `SearchWork`
 4. 当前来源失败时只显示该来源错误，不再展示多来源错误列表
+5. Bangumi 代理路径优先使用线上已部署的 `/api/bangumi/*`，Worker 代码保留 `/api/sources/bangumi/*` 兼容路由
 
 **截图识别策略：**
 1. `TraceMoePanel` 独立于文字搜索源，支持图片 URL 和本地文件上传
@@ -241,13 +235,16 @@ App (状态根)
 - `hasWork(work)`: 通过 `workKey` 集合快速判断是否已入库
 - `addWork(work)`: 从 SearchWork 创建新 record，默认状态为 'done'，并保留来源侧 `animeTags`
 - `updateRecord(id, patch)`: 部分更新，自动记录 updatedAt
-- `deleteRecord(id)`: 同时清理相关 relations
+- `deleteRecord(id)`: 删除对应记录
+- `bulkUpdateRecords(ids, patch)`: 对选中记录执行批量字段更新
+- `deleteRecords(ids)`: 删除一组选中记录
 - `replaceRecords()` / `mergeRecords()`: 导入场景
 
 ### 5.3 统计模块 (`utils/stats.js`)
 
-- `getStats(records)`: 计算总览（总数、完成数、均分）和分布（类型/状态/年份/评分）
+- `getStats(records)`: 计算总览（总数、完成数、均分）、标签词云数据和分布（类型/状态/年份/评分）
 - `filterRecords(records, filters)`: 多条件筛选，支持 title/type/status/year/category/workYear
+- `scripts/tag_wordcloud.py`: 可读取导出的 JSON 备份，使用 `pyecharts` 生成独立交互词云 HTML；未安装依赖时生成静态 fallback
 
 ### 5.4 导入模块 (`utils/importers.js`)
 
@@ -280,7 +277,7 @@ App (状态根)
 ## 8. 文件结构
 
 ```
-My-ACGN-Journey/
+acgn_journey/
 ├── index.html              # 入口 HTML
 ├── package.json            # 依赖说明
 ├── vite.config.js          # Vite 配置 + API 代理
@@ -314,7 +311,6 @@ My-ACGN-Journey/
         ├── TimelinePanel.jsx   # 时间线面板
         ├── StatsPanel.jsx      # 统计面板
         ├── InventoryPanel.jsx  # 实体库存面板
-        ├── RelationGraphPanel.jsx  # 关系图谱面板
         ├── BulkImportPanel.jsx # 批量导入面板
         ├── RecordEditor.jsx    # 记录编辑弹窗
         └── EmptyState.jsx      # 空状态占位组件

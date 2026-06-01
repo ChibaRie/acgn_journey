@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 My ACGN Journey 部署到 GitHub Pages，用一个 Cloudflare Worker 代理 5 个搜索源的上游 API，使线上搜索可用。
+**Goal:** 把 acgn_journey 部署到 GitHub Pages，用一个 Cloudflare Worker 代理 5 个搜索源的上游 API，使线上搜索可用。
 
 **Architecture:** 前端通过 `VITE_API_BASE` 环境变量决定 API 地址（dev 空值走 Vite proxy、prod 指向 Worker）。单个 Cloudflare Worker 用路径前缀路由表转发到 5 个上游并回填 CORS。GitHub Actions 构建并部署 Pages。
 
@@ -49,7 +49,7 @@ Expected: "Merged"。
 - [ ] **Step 3: 在本地 main 同步并基于它建立部署分支**
 
 ```bash
-cd "C:/Users/14507/Desktop/My-ACGN-Journey"
+cd "C:/Users/14507/Desktop/acgn_journey"
 git checkout main && git pull origin main
 git checkout -b feat/deploy-pages-worker
 ```
@@ -212,7 +212,7 @@ Expected: FAIL，模块或导出未定义。
 export const ROUTES = {
   '/api/bangumi': {
     target: 'https://api.bgm.tv',
-    headers: { 'User-Agent': 'MyACGNJourney/0.3 (https://github.com/ChibaRie/My_ACGN_Journey)' },
+    headers: { 'User-Agent': 'acgn_journey/0.3 (https://github.com/ChibaRie/acgn_journey)' },
   },
   '/api/bilibili': {
     target: 'https://api.bilibili.com',
@@ -295,7 +295,7 @@ export default {
     headers.delete('host');
     headers.set(
       'User-Agent',
-      'Mozilla/5.0 (compatible; MyACGNJourney/0.3; +https://github.com/ChibaRie/My_ACGN_Journey)',
+      'Mozilla/5.0 (compatible; acgn_journey/0.3; +https://github.com/ChibaRie/acgn_journey)',
     );
     for (const [k, v] of Object.entries(route.headers)) headers.set(k, v);
 
@@ -357,7 +357,7 @@ git commit -m "feat: add Cloudflare Worker fetch handler and config"
 在 `vite.config.js` 的 `defineConfig({...})` 对象里，`plugins` 之前加一行：
 
 ```js
-  base: process.env.GITHUB_ACTIONS ? '/My_ACGN_Journey/' : '/',
+  base: process.env.GITHUB_ACTIONS ? '/acgn_journey/' : '/',
 ```
 
 （dev/本地 build 用 `/`；只有在 GitHub Actions 环境用仓库名子路径。）
@@ -467,7 +467,7 @@ git commit -m "ci: build with API base and deploy to GitHub Pages"
    - Name: `VITE_API_BASE`
    - Value: 第一步记下的 Worker URL（不带末尾斜杠）
 3. push 到 `main`（或在 Actions 页手动 Run workflow）触发部署。
-4. 部署完成后访问 `https://chibarie.github.io/My_ACGN_Journey/`。
+4. 部署完成后访问 `https://chibarie.github.io/acgn_journey/`。
 
 ## 本地开发
 
@@ -481,7 +481,7 @@ git commit -m "ci: build with API base and deploy to GitHub Pages"
 ```markdown
 ## 在线访问
 
-线上地址：https://chibarie.github.io/My_ACGN_Journey/
+线上地址：https://chibarie.github.io/acgn_journey/
 
 本地库数据保存在浏览器，多源搜索通过 Cloudflare Worker 代理访问 Bangumi、Bilibili、萌娘百科、AniList、VNDB。部署方式见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 ```
@@ -511,7 +511,7 @@ Expected: 全部测试绿，build 成功。
 
 - [ ] **Step 2: 模拟 CI 构建（注入 base + API base）**
 
-Run: `GITHUB_ACTIONS=1 VITE_API_BASE=https://acgn-proxy.example.workers.dev npm run build && grep -q "/My_ACGN_Journey/assets" dist/index.html && echo "base ok"`
+Run: `GITHUB_ACTIONS=1 VITE_API_BASE=https://acgn-proxy.example.workers.dev npm run build && grep -q "/acgn_journey/assets" dist/index.html && echo "base ok"`
 Expected: `base ok`（确认 CI 环境下产物用子路径，且注入的 API base 进入 bundle）。
 
 - [ ] **Step 3: 确认注入的 API base 进入产物**

@@ -1,12 +1,12 @@
-# My ACGN Journey
+# acgn_journey
 
 个人 ACGN 作品记录管理应用。v0.5 将搜索侧改为参考 [anime_trace](https://github.com/linyi102/anime_trace) 的单来源检索：先选择一个来源，再在该来源内搜索作品；同时接入 trace.moe 截图识别。本地库数据保存到浏览器 `LocalStorage`。
 
-当前版本：`v0.5.2`
+当前版本：`v0.5.4`
 
 ## 在线访问
 
-线上地址：https://chibarie.github.io/My_ACGN_Journey/
+线上地址：https://chibarie.github.io/acgn_journey/
 
 本地库数据保存在浏览器。当前默认搜索源按 AGE动漫（直连）、萌娘百科（直连）、Bangumi（需代理）排序；部署方式见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
 
@@ -46,6 +46,15 @@ http://127.0.0.1:5188
 - `npm run app:status`：查看运行状态。
 - `npm run dev`：底层 Vite 开发命令，适合需要前台日志时手动使用。
 
+可选离线词云：
+
+```powershell
+pip install pyecharts
+python scripts/tag_wordcloud.py path\to\backup.json -o tag-wordcloud.html
+```
+
+先在设置面板导出 JSON 备份，再运行上述命令即可生成独立的交互式标签词云页面；未安装 `pyecharts` 时脚本会生成一个静态 HTML fallback。
+
 ## 已实现功能
 
 - 单来源作品搜索：AGE动漫（直连）、萌娘百科（直连）、Bangumi（需代理）。
@@ -53,20 +62,19 @@ http://127.0.0.1:5188
 - 搜索结果展示：标题、封面、类型、简介、来源站点和来源链接。
 - 各源会尽量提取年份、评分、标签或状态等附加信息；AGE动漫会把首播年月、制作公司和剧情类型拆成独立 `animeTags`，便于后续词云统计。站点结构变化时会显示当前来源的错误。
 - 一键加入我的库：默认标记为完成状态，并按类型显示“已看 / 已读 / 已玩”。
-- 我的库管理：编辑标题、类型、作品年份、状态、日期、评分、短评、标签；删除记录。
+- 我的库管理：编辑标题、类型、作品年份、状态、日期、评分、短评、标签；删除记录；支持批量选择当前筛选结果、批量修改状态和批量删除。
 - 我的库分类：支持按 Galgame、轻小说、动漫、漫画、其他和作品年份筛选。
 - 个人历程：按年份分组展示，支持年份、类型、状态筛选。
-- 统计面板：总作品数、已完成数、平均评分、类型/作品年份/记录年份/状态/评分分布。
-- 数据持久化：`localStorage` key 为 `my-acgn-journey:records:v1`。
+- 统计面板：总作品数、已完成数、平均评分、标签词云、类型/作品年份/记录年份/状态/评分分布。
+- 数据持久化：`localStorage` key 为 `acgn_journey:records:v1`。
 - 数据导出与备份：右下角设置面板支持导出 JSON 备份，也支持导入备份覆盖恢复。
 - 自定义背景：右下角设置面板支持导入本地图片作为全局背景，可调节不透明度与模糊度；图片以 base64 存入 LocalStorage，不上传云端。
 - 实体库存管理：可记录实体藏品的购买价格、购买渠道、摆放位置、是否限定版、开封状态、购买日期和备注。
-- 关系图谱：可建立系列作品、同一世界观、同一作者/会社、改编关系、衍生作品等关系，并用节点图展示。
 - 批量导入：支持 Bangumi、MyAnimeList、AniList、VNDB 或通用 CSV 导入，也支持 MyAnimeList XML 导入；导入前可预览，支持合并或覆盖。
 
 ## 更新记录
 
-### v0.5.2（当前）
+### v0.5.4（当前）
 
 - **搜索核心替换为 anime_trace 式单来源模式**：移除旧的 AniList / VNDB / 月幕Galgame 聚合搜索入口，搜索 UI 改为“先选来源，再搜作品”。
 - **代理白名单收窄**：本地 Vite proxy 与 Cloudflare Worker 仅保留仍有价值的 Bangumi / AGE动漫固定前缀，不通过 query/body 传入任意上游 URL。
@@ -78,6 +86,10 @@ http://127.0.0.1:5188
 - **AGE 元数据增强**：搜索结果中解析“首播时间”“制作公司”“剧情类型/标签”，其中动漫标签单独保存为 `animeTags`，不和用户标签混用。
 - **统一启停工具**：移除旧 Windows 批处理入口，新增 `scripts/dev-server.mjs` 与 `npm run app*` 命令，跨平台管理本地开发服务。
 - **界面收尾**：移除页面 ico 标识，在网页底部新增美观的 GitHub 仓库链接。
+- **Bangumi 代理兼容修复**：前端恢复使用当前线上 Worker 已部署的 `/api/bangumi/*` 路径，同时 Worker 代码保留 `/api/sources/bangumi/*` 兼容路由。
+- **标签词云**：统计页新增可点击标签词云，聚合用户标签与来源解析出的 `animeTags`；另提供 `scripts/tag_wordcloud.py` 从导出 JSON 生成独立词云 HTML。
+- **我的库批量管理**：新增批量管理模式，可选择当前筛选结果、批量修改状态或批量删除选中记录。
+- **项目重命名与版本同步**：项目名、GitHub 仓库、GitHub Pages 路径、导出文件前缀、文档与版本号统一更新为 `acgn_journey` / `v0.5.4`。
 
 ### v0.4
 
@@ -96,7 +108,7 @@ http://127.0.0.1:5188
 
 - 首个完整功能版本：作品库管理、我的库分类与筛选、个人历程时间线、统计面板。
 - 三源搜索：Bangumi、Bilibili、萌娘百科。
-- 实体库存管理、作品关系图谱、批量导入（CSV / MyAnimeList XML 等）。
+- 实体库存管理、批量导入（CSV / MyAnimeList XML 等）。
 - 数据持久化到 LocalStorage，支持 JSON 备份导出/导入。
 - 暗夜/日间双主题。
 
@@ -111,7 +123,8 @@ http://127.0.0.1:5188
 
 当前保留的搜索代理路由仅用于本地验证或后续 fallback，不是默认搜索路径：
 
-- `/api/sources/bangumi/*` -> `https://api.bgm.tv/*`
+- `/api/bangumi/*` -> `https://api.bgm.tv/*`
+- `/api/sources/bangumi/*` -> `https://api.bgm.tv/*`（兼容保留）
 - `/api/sources/age/*` -> `https://www.agedm.io/*`
 
 咕咕番、girigiri愛、豆瓣、NyaFun 已废弃。若未来重新接入，需先完成墙内可用性、CORS/代理、反爬跳转和解析稳定性验证，再新增 adapter 和路由。

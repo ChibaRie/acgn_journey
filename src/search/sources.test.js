@@ -41,7 +41,7 @@ describe('sources registry', () => {
 
   it('prefers proxy urls for proxy-marked sources when a proxy base exists', () => {
     expect(buildPreferredUrl('bangumi', '/v0/search/subjects', 'https://w.example.dev')).toBe(
-      'https://w.example.dev/api/sources/bangumi/v0/search/subjects',
+      'https://w.example.dev/api/bangumi/v0/search/subjects',
     );
     expect(buildPreferredUrl('bangumi', '/v0/search/subjects')).toBe(
       'https://api.bgm.tv/v0/search/subjects',

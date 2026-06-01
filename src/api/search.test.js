@@ -30,7 +30,7 @@ describe('search api compatibility exports', () => {
   it('builds source proxy urls only for retained proxy routes', () => {
     expect(buildSourceUrl('age', '/search?query=x')).toBe('/api/sources/age/search?query=x');
     expect(buildPreferredUrl('bangumi', '/v0/search/subjects', 'https://w.example.dev')).toBe(
-      'https://w.example.dev/api/sources/bangumi/v0/search/subjects',
+      'https://w.example.dev/api/bangumi/v0/search/subjects',
     );
     expect(() => buildSourceUrl('gugu', '/index.php/vod/search.html?wd=x')).toThrow('未知搜索源');
   });

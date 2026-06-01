@@ -1,4 +1,5 @@
-export const BACKGROUND_KEY = 'my-acgn-journey:background:v1';
+export const BACKGROUND_KEY = 'acgn_journey:background:v1';
+const LEGACY_BACKGROUND_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:background:v1`];
 
 export const MAX_BACKGROUND_BYTES = 4 * 1024 * 1024;
 
@@ -26,7 +27,9 @@ export function normalizeBackground(value) {
 
 export function loadBackground() {
   try {
-    const raw = localStorage.getItem(BACKGROUND_KEY);
+    const raw =
+      localStorage.getItem(BACKGROUND_KEY) ||
+      LEGACY_BACKGROUND_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
     if (!raw) return { ...DEFAULT_BACKGROUND };
     return normalizeBackground(JSON.parse(raw));
   } catch {

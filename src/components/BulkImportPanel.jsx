@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { AlertCircle, FileText, UploadCloud } from 'lucide-react';
 import EmptyState from './EmptyState.jsx';
+import ConfirmModal from './ConfirmModal.jsx';
 import { IMPORT_PROVIDERS, parseImportFile } from '../utils/importers.js';
 import { getStatusLabel } from '../utils/library.js';
 
@@ -9,6 +10,7 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
   const [mode, setMode] = useState('merge');
   const [importResult, setImportResult] = useState(null);
   const [error, setError] = useState('');
+  const [confirmReplaceOpen, setConfirmReplaceOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleFileChange = async (event) => {
@@ -21,7 +23,7 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
     try {
       const result = await parseImportFile(file, provider);
       if (result.records.length === 0) {
-        throw new Error('没有识别到可导入的作品记录，请检查文件表头或 XML 导出格式。');
+        throw new Error('没有识别到可导入的作品记录，请检查 JSON 备份、文件表头或 XML 导出格式。');
       }
       setImportResult({
         ...result,
@@ -36,15 +38,17 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
     if (!importResult?.records.length) return;
 
     if (mode === 'replace') {
-      const confirmed = window.confirm(
-        `将用 ${importResult.records.length} 条导入记录覆盖当前作品库。继续吗？`,
-      );
-      if (!confirmed) return;
-      onReplaceRecords(importResult.records);
+      setConfirmReplaceOpen(true);
     } else {
       onMergeRecords(importResult.records);
+      setImportResult(null);
     }
+  };
 
+  const handleConfirmReplace = () => {
+    if (!importResult?.records.length) return;
+    onReplaceRecords(importResult.records);
+    setConfirmReplaceOpen(false);
     setImportResult(null);
   };
 
@@ -53,7 +57,7 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
       <div className="section-heading split">
         <div>
           <p className="eyebrow">批量导入</p>
-          <h2 id="import-title">从 Bangumi、MAL、AniList、VNDB 的 XML/CSV 导入作品库</h2>
+          <h2 id="import-title">从 JSON、XML 或 CSV 导入作品库</h2>
         </div>
         <div className="result-count">{importResult?.records.length || 0} 条待导入</div>
       </div>
@@ -62,7 +66,7 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
         <section className="import-dropzone" aria-label="文件导入">
           <UploadCloud size={36} />
           <h3>选择导出文件</h3>
-          <p>支持 CSV 与 MyAnimeList XML。系统会根据文件名和表头自动映射标题、类型、状态、评分、标签与日期。</p>
+          <p>支持本项目 JSON 备份、MyAnimeList XML 和常见 CSV。系统会根据文件名和表头自动映射标题、类型、状态、评分、标签与日期。</p>
           <div className="import-controls">
             <label>
               <span>来源平台</span>
@@ -84,13 +88,13 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
           </div>
           <button className="button primary" type="button" onClick={() => fileInputRef.current?.click()}>
             <FileText size={16} />
-            <span>选择 XML / CSV</span>
+            <span>选择 JSON / XML / CSV</span>
           </button>
           <input
             ref={fileInputRef}
             className="sr-only"
             type="file"
-            accept=".csv,.xml,text/csv,text/xml,application/xml"
+            accept=".json,.csv,.xml,application/json,text/csv,text/xml,application/xml"
             onChange={handleFileChange}
           />
         </section>
@@ -155,6 +159,18 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
             ))}
           </div>
         </section>
+      )}
+
+      {confirmReplaceOpen && importResult && (
+        <ConfirmModal
+          eyebrow="覆盖导入"
+          title="覆盖当前作品库？"
+          description={`将用 ${importResult.fileName} 中的 ${importResult.records.length} 条导入记录覆盖当前作品库。建议先在设置中导出当前备份再继续。`}
+          icon={UploadCloud}
+          confirmLabel="确认覆盖"
+          onCancel={() => setConfirmReplaceOpen(false)}
+          onConfirm={handleConfirmReplace}
+        />
       )}
     </section>
   );

@@ -24,10 +24,18 @@ import StatsPanel from './components/StatsPanel.jsx';
 import InventoryPanel from './components/InventoryPanel.jsx';
 import BulkImportPanel from './components/BulkImportPanel.jsx';
 import RecordEditor from './components/RecordEditor.jsx';
+import ConfirmModal from './components/ConfirmModal.jsx';
 import { useLibrary } from './hooks/useLibrary.js';
 import { useBackground } from './hooks/useBackground.js';
 import { getStats } from './utils/stats.js';
-import { createBackup, getDoneLabel, readBackup } from './utils/library.js';
+import {
+  EXPORT_FORMATS,
+  createExportText,
+  getDoneLabel,
+  getExportFileName,
+  getExportMimeType,
+  readBackup,
+} from './utils/library.js';
 import { readImageFile } from './utils/background.js';
 import { loadLocalSetting, saveLocalSetting } from './utils/localApi.js';
 
@@ -61,6 +69,8 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [showCover, setShowCover] = useState(true);
   const [coverLeaving, setCoverLeaving] = useState(false);
+  const [exportFormat, setExportFormat] = useState('json');
+  const [pendingBackupImport, setPendingBackupImport] = useState(null);
   const fileInputRef = useRef(null);
   const bgInputRef = useRef(null);
   const {
@@ -173,17 +183,18 @@ export default function App() {
   };
 
   const handleExportBackup = () => {
-    const backup = createBackup(records);
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const blob = new Blob([createExportText(records, exportFormat)], {
+      type: getExportMimeType(exportFormat),
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `acgn_journey-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = getExportFileName(exportFormat);
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    showToast(`已导出 ${records.length} 条记录`);
+    showToast(`已导出 ${records.length} 条 ${exportFormat.toUpperCase()} 备份`);
   };
 
   const handleImportBackup = async (event) => {
@@ -194,15 +205,20 @@ export default function App() {
     try {
       const payload = JSON.parse(await file.text());
       const importedRecords = readBackup(payload);
-      const confirmed = window.confirm(
-        `将导入 ${importedRecords.length} 条记录并覆盖当前作品库。继续吗？`,
-      );
-      if (!confirmed) return;
-      replaceRecords(importedRecords);
-      showToast(`已恢复 ${importedRecords.length} 条备份记录`);
+      setPendingBackupImport({
+        records: importedRecords,
+        fileName: file.name,
+      });
     } catch (error) {
       showToast(error.message || '备份导入失败');
     }
+  };
+
+  const handleConfirmBackupImport = () => {
+    if (!pendingBackupImport) return;
+    replaceRecords(pendingBackupImport.records);
+    showToast(`已恢复 ${pendingBackupImport.records.length} 条备份记录`);
+    setPendingBackupImport(null);
   };
 
   const handleImportBackground = async (event) => {
@@ -461,10 +477,27 @@ export default function App() {
             </label>
           </div>
 
+          <div className="settings-section">
+            <div className="settings-section-head">
+              <p className="settings-section-title">导出格式</p>
+              <span className="settings-section-hint">JSON 可直接恢复</span>
+            </div>
+            <label className="settings-select">
+              <span>备份文件格式</span>
+              <select value={exportFormat} onChange={(event) => setExportFormat(event.target.value)}>
+                {EXPORT_FORMATS.map((format) => (
+                  <option key={format.value} value={format.value}>
+                    {format.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
           <div className="settings-actions">
             <button className="button primary" type="button" onClick={handleExportBackup}>
               <Download size={16} />
-              <span>导出备份</span>
+              <span>导出 {exportFormat.toUpperCase()}</span>
             </button>
             <button
               className="button secondary"
@@ -511,6 +544,18 @@ export default function App() {
           record={editingRecord}
           onClose={() => setEditingRecord(null)}
           onSave={handleSaveRecord}
+        />
+      )}
+
+      {pendingBackupImport && (
+        <ConfirmModal
+          eyebrow="备份导入"
+          title="覆盖当前作品库？"
+          description={`将用 ${pendingBackupImport.fileName} 中的 ${pendingBackupImport.records.length} 条记录覆盖当前作品库。建议先导出当前备份再继续。`}
+          icon={Upload}
+          confirmLabel="确认覆盖"
+          onCancel={() => setPendingBackupImport(null)}
+          onConfirm={handleConfirmBackupImport}
         />
       )}
 

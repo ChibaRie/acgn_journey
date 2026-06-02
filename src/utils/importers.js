@@ -1,7 +1,8 @@
-import { createId, getYearFromDate, normalizeRecord, normalizeTags } from './library.js';
+import { createId, getYearFromDate, normalizeRecord, normalizeTags, readBackup } from './library.js';
 
 export const IMPORT_PROVIDERS = [
   { value: 'auto', label: '自动识别' },
+  { value: 'acgn', label: 'acgn_journey JSON' },
   { value: 'bangumi', label: 'Bangumi CSV' },
   { value: 'mal', label: 'MyAnimeList XML/CSV' },
   { value: 'anilist', label: 'AniList CSV' },
@@ -10,6 +11,7 @@ export const IMPORT_PROVIDERS = [
 ];
 
 const PROVIDER_LABELS = {
+  acgn: 'acgn_journey',
   bangumi: 'Bangumi',
   mal: 'MyAnimeList',
   anilist: 'AniList',
@@ -164,6 +166,7 @@ function normalizeType(value, provider) {
 function getProviderFromFile(fileName, requestedProvider) {
   if (requestedProvider && requestedProvider !== 'auto') return requestedProvider;
   const name = fileName.toLowerCase();
+  if (name.endsWith('.json')) return 'acgn';
   if (name.includes('myanimelist') || name.includes('mal')) return 'mal';
   if (name.includes('anilist')) return 'anilist';
   if (name.includes('vndb')) return 'vndb';
@@ -294,16 +297,30 @@ function parseMalXml(text) {
   ].filter(Boolean);
 }
 
+function parseAcgnJson(text) {
+  try {
+    return readBackup(JSON.parse(text));
+  } catch (error) {
+    throw new Error(error.message || 'JSON 文件格式不正确');
+  }
+}
+
 export function parseImportText(text, { provider = 'auto', fileName = 'import.csv' } = {}) {
   const resolvedProvider = getProviderFromFile(fileName, provider);
   const lowerName = fileName.toLowerCase();
+  const looksLikeJson = lowerName.endsWith('.json') || /^\s*[\[{]/.test(text);
   const looksLikeXml = lowerName.endsWith('.xml') || /^\s*</.test(text);
-  const records =
-    looksLikeXml && (resolvedProvider === 'mal' || resolvedProvider === 'generic')
-      ? parseMalXml(text)
-      : parseCsv(text)
-          .map((row) => rowToRecord(row, resolvedProvider))
-          .filter(Boolean);
+  let records;
+
+  if (looksLikeJson || resolvedProvider === 'acgn') {
+    records = parseAcgnJson(text);
+  } else if (looksLikeXml && (resolvedProvider === 'mal' || resolvedProvider === 'generic')) {
+    records = parseMalXml(text);
+  } else {
+    records = parseCsv(text)
+      .map((row) => rowToRecord(row, resolvedProvider))
+      .filter(Boolean);
+  }
 
   return {
     provider: resolvedProvider,

@@ -178,6 +178,7 @@ App
   TimelinePanel
   StatsPanel
   RecordEditor
+  ConfirmModal
   SettingsPopover
   FloatingToolbar
 ```
@@ -189,10 +190,10 @@ App
 
 关键工具：
 
-- `src/utils/library.js`：记录归一化、备份导入导出、状态/分类工具。
+- `src/utils/library.js`：记录归一化、JSON/XML/CSV 备份导出、JSON 备份读取、状态/分类工具。
 - `src/utils/localApi.js`：本机数据服务客户端。
 - `src/utils/stats.js`：统计与筛选。
-- `src/utils/importers.js`：CSV/XML 导入。
+- `src/utils/importers.js`：本项目 JSON 备份、CSV 与 XML 导入。
 
 ## 8. 文件结构
 

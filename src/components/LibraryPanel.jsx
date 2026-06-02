@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CheckSquare, Edit3, Filter, Square, Star, Tag, Trash2, X } from 'lucide-react';
 import EmptyState from './EmptyState.jsx';
+import ConfirmModal from './ConfirmModal.jsx';
 import {
   STATUS_OPTIONS,
   WORK_CATEGORIES,
@@ -366,48 +367,20 @@ export default function LibraryPanel({
       </div>
 
       {deleteDialog && (
-        <div className="modal-backdrop" role="presentation">
-          <section
-            className="confirm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-dialog-title"
-            aria-describedby="delete-dialog-description"
-          >
-            <div className="confirm-icon danger" aria-hidden="true">
-              <Trash2 size={22} />
-            </div>
-            <div className="confirm-content">
-              <p className="eyebrow">删除确认</p>
-              <h2 id="delete-dialog-title">
-                {deleteDialog.type === 'bulk' ? '删除选中的记录？' : `删除《${deleteDialog.record.title}》？`}
-              </h2>
-              <p id="delete-dialog-description">
-                {deleteDialog.type === 'bulk'
-                  ? `将删除选中的 ${deleteDialog.count} 条记录。此操作不会影响你的本地备份文件。`
-                  : '这条记录会从我的库中移除。此操作不会影响你的本地备份文件。'}
-              </p>
-            </div>
-            <div className="modal-actions">
-              <button className="button secondary" type="button" onClick={closeDeleteDialog}>
-                取消
-              </button>
-              <button className="button danger" type="button" onClick={handleConfirmDelete}>
-                <Trash2 size={16} />
-                <span>确认删除</span>
-              </button>
-            </div>
-            <button
-              className="icon-button confirm-close"
-              type="button"
-              onClick={closeDeleteDialog}
-              aria-label="关闭删除确认"
-              title="关闭"
-            >
-              <X size={18} />
-            </button>
-          </section>
-        </div>
+        <ConfirmModal
+          eyebrow="删除确认"
+          title={deleteDialog.type === 'bulk' ? '删除选中的记录？' : `删除《${deleteDialog.record.title}》？`}
+          description={
+            deleteDialog.type === 'bulk'
+              ? `将删除选中的 ${deleteDialog.count} 条记录。此操作不会影响你的本地备份文件。`
+              : '这条记录会从我的库中移除。此操作不会影响你的本地备份文件。'
+          }
+          icon={Trash2}
+          tone="danger"
+          confirmLabel="确认删除"
+          onCancel={closeDeleteDialog}
+          onConfirm={handleConfirmDelete}
+        />
       )}
     </section>
   );

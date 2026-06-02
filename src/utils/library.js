@@ -1,6 +1,12 @@
 export const STORAGE_KEY = 'acgn_journey:records:v1';
 const LEGACY_STORAGE_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:records:v1`];
-export const BACKUP_VERSION = '0.7.3';
+export const BACKUP_VERSION = '0.7.5';
+
+export const EXPORT_FORMATS = [
+  { value: 'json', label: 'JSON' },
+  { value: 'xml', label: 'XML' },
+  { value: 'csv', label: 'CSV' },
+];
 
 export const STATUS_OPTIONS = [
   { value: 'wish', defaultLabel: '想看', anime: '想看', book: '想读', game: '想玩' },
@@ -300,6 +306,168 @@ export function readBackup(payload) {
     throw new Error('备份文件格式不正确');
   }
   return records.map(normalizeRecord);
+}
+
+function escapeXml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function escapeCsv(value = '') {
+  const text = String(value ?? '');
+  if (!/[",\r\n]/.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function exportRecordToXml(record) {
+  const normalized = normalizeRecord(record);
+  const fields = [
+    ['id', normalized.id],
+    ['workKey', normalized.workKey],
+    ['source', normalized.source],
+    ['sourceId', normalized.sourceId],
+    ['sourceUrl', normalized.sourceUrl],
+    ['title', normalized.title],
+    ['originalTitle', normalized.originalTitle],
+    ['cover', normalized.cover],
+    ['type', normalized.type],
+    ['summary', normalized.summary],
+    ['releaseDate', normalized.releaseDate],
+    ['releaseYear', normalized.releaseYear],
+    ['status', normalized.status],
+    ['rating', normalized.rating],
+    ['comment', normalized.comment],
+    ['tags', normalized.tags.join(', ')],
+    ['animeTags', normalized.animeTags.join(', ')],
+    ['startedAt', normalized.startedAt],
+    ['finishedAt', normalized.finishedAt],
+    ['addedAt', normalized.addedAt],
+    ['updatedAt', normalized.updatedAt],
+  ];
+
+  const inventoryFields = Object.entries(normalized.inventory)
+    .map(([key, value]) => `      <${key}>${escapeXml(value)}</${key}>`)
+    .join('\n');
+
+  return [
+    '    <record>',
+    ...fields.map(([key, value]) => `      <${key}>${escapeXml(value)}</${key}>`),
+    '      <inventory>',
+    inventoryFields,
+    '      </inventory>',
+    '    </record>',
+  ].join('\n');
+}
+
+function exportBackupToXml(backup) {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<backup app="acgn_journey">',
+    `  <version>${escapeXml(backup.version)}</version>`,
+    `  <exportedAt>${escapeXml(backup.exportedAt)}</exportedAt>`,
+    `  <recordCount>${backup.recordCount}</recordCount>`,
+    '  <records>',
+    ...backup.records.map(exportRecordToXml),
+    '  </records>',
+    '</backup>',
+    '',
+  ].join('\n');
+}
+
+function exportBackupToCsv(backup) {
+  const columns = [
+    'id',
+    'workKey',
+    'source',
+    'sourceId',
+    'sourceUrl',
+    'title',
+    'originalTitle',
+    'cover',
+    'type',
+    'summary',
+    'releaseDate',
+    'releaseYear',
+    'status',
+    'rating',
+    'comment',
+    'tags',
+    'animeTags',
+    'startedAt',
+    'finishedAt',
+    'addedAt',
+    'updatedAt',
+    'inventoryOwned',
+    'inventoryFormat',
+    'purchasePrice',
+    'purchaseChannel',
+    'shelfLocation',
+    'limitedEdition',
+    'openStatus',
+    'purchasedAt',
+    'inventoryNotes',
+  ];
+
+  const rows = backup.records.map((record) => {
+    const normalized = normalizeRecord(record);
+    const inventory = normalized.inventory;
+    return [
+      normalized.id,
+      normalized.workKey,
+      normalized.source,
+      normalized.sourceId,
+      normalized.sourceUrl,
+      normalized.title,
+      normalized.originalTitle,
+      normalized.cover,
+      normalized.type,
+      normalized.summary,
+      normalized.releaseDate,
+      normalized.releaseYear,
+      normalized.status,
+      normalized.rating,
+      normalized.comment,
+      normalized.tags.join('; '),
+      normalized.animeTags.join('; '),
+      normalized.startedAt,
+      normalized.finishedAt,
+      normalized.addedAt,
+      normalized.updatedAt,
+      inventory.owned ? 'true' : 'false',
+      inventory.format,
+      inventory.purchasePrice,
+      inventory.purchaseChannel,
+      inventory.shelfLocation,
+      inventory.limitedEdition ? 'true' : 'false',
+      inventory.openStatus,
+      inventory.purchasedAt,
+      inventory.notes,
+    ];
+  });
+
+  return [columns, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+}
+
+export function getExportFileName(format, date = new Date()) {
+  const normalizedFormat = EXPORT_FORMATS.some((item) => item.value === format) ? format : 'json';
+  return `acgn_journey-backup-${date.toISOString().slice(0, 10)}.${normalizedFormat}`;
+}
+
+export function getExportMimeType(format) {
+  if (format === 'xml') return 'application/xml;charset=utf-8';
+  if (format === 'csv') return 'text/csv;charset=utf-8';
+  return 'application/json;charset=utf-8';
+}
+
+export function createExportText(records, format = 'json') {
+  const backup = createBackup(records);
+  if (format === 'xml') return exportBackupToXml(backup);
+  if (format === 'csv') return exportBackupToCsv(backup);
+  return JSON.stringify(backup, null, 2);
 }
 
 export function normalizeTags(value) {

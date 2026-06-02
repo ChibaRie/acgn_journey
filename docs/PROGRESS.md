@@ -1,13 +1,13 @@
 # 项目进度记录
 
 > 最后更新：2026-06-02
-> 当前版本：`v0.7.3` ｜ 默认分支：`main` ｜ 远程：github.com/ChibaRie/acgn_journey
+> 当前版本：`v0.7.5` ｜ 默认分支：`main` ｜ 远程：github.com/ChibaRie/acgn_journey
 
 ## 当前状态
 
 | 项 | 状态 |
 |---|---|
-| 版本 | v0.7.3 |
+| 版本 | v0.7.5 |
 | 主要形态 | Electron 桌面软件 + 本机 SQLite |
 | 在线演示 | GitHub Pages |
 | 线上地址 | https://chibarie.github.io/acgn_journey/ |
@@ -15,6 +15,32 @@
 | 默认搜索源 | AGE动漫、萌娘百科、Bangumi |
 | 截图识别 | trace.moe |
 | 数据持久化 | 本机 SQLite，浏览器 LocalStorage 作为 fallback |
+
+## v0.7.5 交付内容
+
+### 1. 多格式备份导出
+
+- 设置面板新增备份文件格式选择，支持 `JSON`、`XML` 和 `CSV`。
+- JSON 继续作为完整恢复格式；XML/CSV 作为可读、可迁移的导出格式。
+- 导出文件名统一使用 `acgn_journey-backup-日期.格式`。
+
+### 2. JSON 批量导入
+
+- `批量导入` 页面支持选择 JSON 文件。
+- 支持本项目导出的完整 JSON 备份，也支持直接 records 数组 JSON。
+- 导入来源列表新增 `acgn_journey JSON`，自动识别 `.json` 文件。
+
+### 3. 应用内确认弹窗统一
+
+- 新增通用确认弹窗组件。
+- 备份导入覆盖、批量导入覆盖和我的库删除确认均使用应用内弹窗。
+- 移除相关流程中的浏览器原生 `confirm`。
+
+### 4. 文档、版本与测试同步
+
+- package 版本和导出备份版本号同步更新到 `0.7.5`。
+- README、进度记录和架构文档同步补充本次功能。
+- 新增导出格式与 JSON 导入测试。
 
 ## v0.7.3 交付内容
 

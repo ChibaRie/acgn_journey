@@ -944,6 +944,7 @@ a {
 .quick-add-row select,
 .bulk-actions select,
 .import-controls select,
+.settings-select select,
 .editor-form input,
 .editor-form select,
 .editor-form textarea {
@@ -960,6 +961,7 @@ a {
 .quick-add-row select:focus-visible,
 .bulk-actions select:focus-visible,
 .import-controls select:focus-visible,
+.settings-select select:focus-visible,
 .editor-form input:focus-visible,
 .editor-form select:focus-visible,
 .editor-form textarea:focus-visible,
@@ -1887,6 +1889,15 @@ a {
 .settings-section-hint {
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.settings-select {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .settings-slider {

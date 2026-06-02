@@ -26,6 +26,7 @@ export default function LibraryPanel({
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('');
+  const [deleteDialog, setDeleteDialog] = useState(null);
   const filteredRecords = useMemo(() => filterRecords(records, filters), [records, filters]);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const visibleRecordIds = useMemo(() => filteredRecords.map((record) => record.id), [filteredRecords]);
@@ -104,17 +105,36 @@ export default function LibraryPanel({
 
   const handleBulkDelete = () => {
     if (selectedCount === 0) return;
-    const confirmed = window.confirm(`删除选中的 ${selectedCount} 条记录？`);
-    if (!confirmed) return;
-    onDeleteRecords(selectedIds);
-    setSelectedIds([]);
-    setBulkStatus('');
+    setDeleteDialog({
+      type: 'bulk',
+      ids: [...selectedIds],
+      count: selectedCount,
+    });
   };
 
   const confirmDelete = (record) => {
-    if (window.confirm(`删除《${record.title}》这条记录？`)) {
-      onDeleteRecord(record.id);
+    setDeleteDialog({
+      type: 'single',
+      record,
+    });
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteDialog) return;
+
+    if (deleteDialog.type === 'bulk') {
+      onDeleteRecords(deleteDialog.ids);
+      setSelectedIds([]);
+      setBulkStatus('');
+    } else {
+      onDeleteRecord(deleteDialog.record.id);
     }
+
+    setDeleteDialog(null);
   };
 
   return (
@@ -344,6 +364,51 @@ export default function LibraryPanel({
           );
         })}
       </div>
+
+      {deleteDialog && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-dialog-title"
+            aria-describedby="delete-dialog-description"
+          >
+            <div className="confirm-icon danger" aria-hidden="true">
+              <Trash2 size={22} />
+            </div>
+            <div className="confirm-content">
+              <p className="eyebrow">删除确认</p>
+              <h2 id="delete-dialog-title">
+                {deleteDialog.type === 'bulk' ? '删除选中的记录？' : `删除《${deleteDialog.record.title}》？`}
+              </h2>
+              <p id="delete-dialog-description">
+                {deleteDialog.type === 'bulk'
+                  ? `将删除选中的 ${deleteDialog.count} 条记录。此操作不会影响你的本地备份文件。`
+                  : '这条记录会从我的库中移除。此操作不会影响你的本地备份文件。'}
+              </p>
+            </div>
+            <div className="modal-actions">
+              <button className="button secondary" type="button" onClick={closeDeleteDialog}>
+                取消
+              </button>
+              <button className="button danger" type="button" onClick={handleConfirmDelete}>
+                <Trash2 size={16} />
+                <span>确认删除</span>
+              </button>
+            </div>
+            <button
+              className="icon-button confirm-close"
+              type="button"
+              onClick={closeDeleteDialog}
+              aria-label="关闭删除确认"
+              title="关闭"
+            >
+              <X size={18} />
+            </button>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

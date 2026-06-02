@@ -59,6 +59,8 @@ export default function App() {
   const [theme, setTheme] = useState(getInitialTheme);
   const [themeStorageMode, setThemeStorageMode] = useState('checking');
   const [toast, setToast] = useState('');
+  const [showCover, setShowCover] = useState(true);
+  const [coverLeaving, setCoverLeaving] = useState(false);
   const fileInputRef = useRef(null);
   const bgInputRef = useRef(null);
   const {
@@ -105,6 +107,19 @@ export default function App() {
       });
     }
   }, [theme, themeStorageMode]);
+
+  const handleEnterApp = () => {
+    if (coverLeaving) return;
+    setCoverLeaving(true);
+    window.setTimeout(() => setShowCover(false), 560);
+  };
+
+  const handleCoverKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleEnterApp();
+    }
+  };
 
   const showToast = (message) => {
     setToast(message);
@@ -210,7 +225,39 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={showCover ? 'app-shell app-shell-with-cover' : 'app-shell'}>
+      {showCover && (
+        <section
+          className={coverLeaving ? 'cover-screen leaving' : 'cover-screen'}
+          aria-labelledby="cover-title"
+          role="button"
+          tabIndex={0}
+          onClick={handleEnterApp}
+          onKeyDown={handleCoverKeyDown}
+        >
+          <div className="cover-atmosphere" aria-hidden="true" />
+          <div className="cover-mosaic" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="cover-content">
+            <p className="cover-kicker">acgn_journey</p>
+            <h1 id="cover-title">由此开启你的ACGN之旅</h1>
+            <p className="cover-lead">
+              让作品、进度、收藏和回忆落在自己的设备里。轻点任意一处，进入你的私人档案。
+            </p>
+          </div>
+        </section>
+      )}
+
+      <div
+        className={showCover && !coverLeaving ? 'main-stage behind-cover' : 'main-stage ready'}
+        aria-hidden={showCover && !coverLeaving}
+      >
       {background.image && (
         <div
           className="app-background"
@@ -254,6 +301,7 @@ export default function App() {
       </header>
 
       <main className="workspace">
+        <div key={activeTab} className="view-transition">
         {activeTab === 'search' && (
           <SearchPanel hasWork={hasWork} onAddWork={handleAddWork} />
         )}
@@ -292,6 +340,7 @@ export default function App() {
         )}
 
         {activeTab === 'stats' && <StatsPanel records={records} stats={stats} />}
+        </div>
       </main>
 
       <footer className="site-footer">
@@ -467,6 +516,7 @@ export default function App() {
 
       <div className={toast ? 'toast show' : 'toast'} role="status" aria-live="polite">
         {toast}
+      </div>
       </div>
     </div>
   );

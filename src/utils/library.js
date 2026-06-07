@@ -1,6 +1,6 @@
 export const STORAGE_KEY = 'acgn_journey:records:v1';
 const LEGACY_STORAGE_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:records:v1`];
-export const BACKUP_VERSION = '0.7.5';
+export const BACKUP_VERSION = '0.7.6';
 
 export const EXPORT_FORMATS = [
   { value: 'json', label: 'JSON' },

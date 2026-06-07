@@ -1009,6 +1009,56 @@ a {
   font-weight: 800;
 }
 
+.library-heading-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.library-view-toggle {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+
+.library-view-toggle button {
+  display: inline-flex;
+  min-height: 36px;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  border-radius: 5px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.library-view-toggle button:hover,
+.library-view-toggle button:focus-visible {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.library-view-toggle button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.library-view-toggle button.active {
+  color: var(--control-active-text);
+  background: var(--control-active);
+}
+
 .library-list {
   display: grid;
   gap: 12px;
@@ -1091,6 +1141,127 @@ a {
 .item-actions {
   display: flex;
   gap: 8px;
+}
+
+.library-list.grid-view {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.library-list.grid-view .library-item {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.library-list.grid-view .library-item.selected {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 50%),
+    var(--card-bg);
+}
+
+.library-list.grid-view .mini-cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 0;
+  font-size: 1.4rem;
+}
+
+.library-list.grid-view .library-content {
+  display: flex;
+  width: 100%;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.library-list.grid-view .library-title-row {
+  flex-direction: column;
+  gap: 9px;
+}
+
+.library-list.grid-view .library-title-row h3 {
+  display: -webkit-box;
+  min-height: 2.7em;
+  overflow: hidden;
+  font-size: 1.02rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.library-list.grid-view .library-title-row p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.library-list.grid-view .status-pill {
+  align-self: flex-start;
+}
+
+.library-list.grid-view .summary,
+.library-list.grid-view .record-tags {
+  display: none;
+}
+
+.library-list.grid-view .record-meta {
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.library-list.grid-view .library-select,
+.library-list.grid-view .item-actions {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+}
+
+.library-list.grid-view .library-select {
+  left: 10px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(20, 26, 38, 0.7);
+  border-radius: 7px;
+  box-shadow: 0 8px 20px rgba(20, 26, 38, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+.library-list.grid-view .library-select input {
+  width: 19px;
+  height: 19px;
+}
+
+.library-list.grid-view .item-actions {
+  right: 10px;
+  gap: 6px;
+}
+
+.library-list.grid-view .icon-button {
+  width: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.68);
+  background: rgba(20, 26, 38, 0.7);
+  box-shadow: 0 8px 20px rgba(20, 26, 38, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+.library-list.grid-view .icon-button:hover,
+.library-list.grid-view .icon-button:focus-visible {
+  color: #fff;
+  border-color: #fff;
+  background: rgba(20, 26, 38, 0.9);
 }
 
 .quick-add-row {
@@ -2128,6 +2299,20 @@ a {
     align-items: start;
   }
 
+  .library-heading-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .library-list.grid-view {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .library-list.grid-view .library-item {
+    display: flex;
+  }
+
   .item-actions {
     justify-content: flex-end;
   }
@@ -2177,5 +2362,15 @@ a {
 
   .cover-frame {
     aspect-ratio: 1 / 1;
+  }
+
+  .library-view-toggle button span {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .library-list.grid-view {
+    grid-template-columns: 1fr;
   }
 }

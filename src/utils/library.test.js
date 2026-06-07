@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createExportText, createRecordFromWork, normalizeRecord } from './library.js';
+import {
+  BACKUP_VERSION,
+  createExportText,
+  createRecordFromWork,
+  normalizeRecord,
+} from './library.js';
 
 describe('library record normalization', () => {
   it('keeps source anime tags separate from user tags', () => {
@@ -37,7 +42,10 @@ describe('library record normalization', () => {
     const xml = createExportText([record], 'xml');
     const csv = createExportText([record], 'csv');
 
-    expect(JSON.parse(json).records[0].title).toBe('白色相簿2');
+    expect(JSON.parse(json)).toMatchObject({
+      version: BACKUP_VERSION,
+      records: [{ title: '白色相簿2' }],
+    });
     expect(xml).toContain('<title>白色相簿2</title>');
     expect(xml).toContain('<comment>冬日, 音乐 &quot;名作&quot;</comment>');
     expect(csv).toContain('title');

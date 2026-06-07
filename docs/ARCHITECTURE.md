@@ -191,6 +191,7 @@ App
 关键工具：
 
 - `src/utils/library.js`：记录归一化、JSON/XML/CSV 备份导出、JSON 备份读取、状态/分类工具。
+- `src/utils/libraryView.js`：作品库列表/方块视图偏好的归一化与 LocalStorage 持久化。
 - `src/utils/localApi.js`：本机数据服务客户端。
 - `src/utils/stats.js`：统计与筛选。
 - `src/utils/importers.js`：本项目 JSON 备份、CSV 与 XML 导入。

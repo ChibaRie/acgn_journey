@@ -1,5 +1,16 @@
 import { useMemo, useState } from 'react';
-import { CheckSquare, Edit3, Filter, Square, Star, Tag, Trash2, X } from 'lucide-react';
+import {
+  CheckSquare,
+  Edit3,
+  Filter,
+  LayoutGrid,
+  List,
+  Square,
+  Star,
+  Tag,
+  Trash2,
+  X,
+} from 'lucide-react';
 import EmptyState from './EmptyState.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import {
@@ -10,6 +21,7 @@ import {
   getWorkYear,
 } from '../utils/library.js';
 import { filterRecords } from '../utils/stats.js';
+import { loadLibraryView, saveLibraryView } from '../utils/libraryView.js';
 
 export default function LibraryPanel({
   records,
@@ -28,6 +40,7 @@ export default function LibraryPanel({
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('');
   const [deleteDialog, setDeleteDialog] = useState(null);
+  const [viewMode, setViewMode] = useState(loadLibraryView);
   const filteredRecords = useMemo(() => filterRecords(records, filters), [records, filters]);
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const visibleRecordIds = useMemo(() => filteredRecords.map((record) => record.id), [filteredRecords]);
@@ -68,6 +81,10 @@ export default function LibraryPanel({
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const changeViewMode = (nextViewMode) => {
+    setViewMode(saveLibraryView(nextViewMode));
   };
 
   const toggleBulkMode = () => {
@@ -145,8 +162,34 @@ export default function LibraryPanel({
           <p className="eyebrow">本地作品库</p>
           <h2 id="library-title">按分类查看、编辑状态、评分、短评和标签</h2>
         </div>
-        <div className="result-count">
-          {filteredRecords.length} / {records.length}
+        <div className="library-heading-actions">
+          <div className="result-count">
+            {filteredRecords.length} / {records.length}
+          </div>
+          <div className="library-view-toggle" role="group" aria-label="作品库视图">
+            <button
+              className={viewMode === 'list' ? 'active' : ''}
+              type="button"
+              onClick={() => changeViewMode('list')}
+              aria-pressed={viewMode === 'list'}
+              aria-label="切换为列表视图"
+              title="列表视图"
+            >
+              <List size={17} />
+              <span>列表</span>
+            </button>
+            <button
+              className={viewMode === 'grid' ? 'active' : ''}
+              type="button"
+              onClick={() => changeViewMode('grid')}
+              aria-pressed={viewMode === 'grid'}
+              aria-label="切换为方块视图"
+              title="方块视图"
+            >
+              <LayoutGrid size={17} />
+              <span>方块</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -275,7 +318,10 @@ export default function LibraryPanel({
         <EmptyState title="当前分类下没有记录" description="换一个分类、状态或关键词看看。" />
       )}
 
-      <div className="library-list">
+      <div
+        className={`library-list ${viewMode === 'grid' ? 'grid-view' : 'list-view'}`}
+        data-view={viewMode}
+      >
         {filteredRecords.map((record) => {
           const displayTags = record.tags.length > 0 ? record.tags : record.animeTags || [];
           const isSelected = selectedIdSet.has(record.id);
@@ -334,7 +380,7 @@ export default function LibraryPanel({
                     {record.rating > 0 ? `${record.rating}/10` : '未评分'}
                   </span>
                   <span>{getWorkYear(record)} 年</span>
-                  <span>
+                  <span className="record-tags">
                     <Tag size={15} />
                     {displayTags.length > 0 ? displayTags.join(' / ') : '无标签'}
                   </span>

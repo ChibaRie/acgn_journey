@@ -68,3 +68,38 @@ export async function saveLocalSetting(key, value) {
     timeoutMs: 8000,
   });
 }
+
+export async function deleteLocalSetting(key) {
+  return requestJson(`/api/local/settings/${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+    timeoutMs: 8000,
+  });
+}
+
+export async function requestAiProfile(profileInputOrMessages) {
+  return requestJson('/api/local/ai/profile', {
+    method: 'POST',
+    body: JSON.stringify(
+      Array.isArray(profileInputOrMessages)
+        ? { messages: profileInputOrMessages }
+        : { profileInput: profileInputOrMessages },
+    ),
+    timeoutMs: 45000,
+  });
+}
+
+export async function requestAiModels(config) {
+  return requestJson('/api/local/ai/models', {
+    method: 'POST',
+    body: JSON.stringify({ config }),
+    timeoutMs: 45000,
+  });
+}
+
+export async function testAiProfileConnection(config) {
+  return requestJson('/api/local/ai/test', {
+    method: 'POST',
+    body: JSON.stringify({ config }),
+    timeoutMs: 45000,
+  });
+}

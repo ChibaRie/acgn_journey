@@ -134,12 +134,12 @@ describe('MangaBaka adapter', () => {
     expect(isAdultMangabakaItem({ content_rating: 'safe', genres: ['ecchi'] })).toBe(false);
   });
 
-  it('requests at most ten novels and passes AbortSignal through', async () => {
+  it('requests up to the shared result limit and passes AbortSignal through', async () => {
     const controller = new AbortController();
     const fetchImpl = vi.fn(async () =>
       response([
         { id: 'adult', content_rating: 'pornographic' },
-        ...Array.from({ length: 11 }, (_, index) => ({
+        ...Array.from({ length: 25 }, (_, index) => ({
           id: index + 1,
           title: `Novel ${index + 1}`,
           content_rating: 'safe',
@@ -154,10 +154,10 @@ describe('MangaBaka adapter', () => {
 
     expect(fetchImpl).toHaveBeenCalledOnce();
     expect(fetchImpl).toHaveBeenCalledWith(
-      'https://api.mangabaka.org/v1/series/search?q=%E8%8D%AF%E5%B1%8B%E5%B0%91%E5%A5%B3%E7%9A%84%E5%91%A2%E5%96%83&type=novel&limit=10',
+      'https://api.mangabaka.org/v1/series/search?q=%E8%8D%AF%E5%B1%8B%E5%B0%91%E5%A5%B3%E7%9A%84%E5%91%A2%E5%96%83&type=novel&limit=24',
       { signal: controller.signal },
     );
-    expect(works).toHaveLength(10);
+    expect(works).toHaveLength(24);
     expect(works.every((work) => work.sourceId !== 'adult')).toBe(true);
   });
 

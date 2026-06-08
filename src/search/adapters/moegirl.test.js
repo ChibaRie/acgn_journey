@@ -18,6 +18,7 @@ describe('moegirl adapter', () => {
     const params = buildMoegirlParams('孤独摇滚');
     expect(params.get('origin')).toBe('*');
     expect(params.get('gsrsearch')).toBe('孤独摇滚');
+    expect(params.get('gsrlimit')).toBe('24');
     expect(params.get('cllimit')).toBe('max');
   });
 

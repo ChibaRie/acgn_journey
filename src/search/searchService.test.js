@@ -28,7 +28,7 @@ describe('searchSource', () => {
 
     const response = await searchSource('bangumi', '芙莉莲', { fetchImpl });
     expect(response).toEqual({ items: [], error: null });
-    expect(calls).toEqual(['https://api.bgm.tv/v0/search/subjects?limit=12&offset=0']);
+    expect(calls).toEqual(['https://api.bgm.tv/v0/search/subjects?limit=24&offset=0']);
   });
 
   it('dispatches MangaBaka searches to the direct novel endpoint', async () => {

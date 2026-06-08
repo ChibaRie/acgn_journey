@@ -1,5 +1,6 @@
 import { buildPreferredUrl } from '../sources.js';
 import { getYear, normalizeUrl, stripHtml, uniqueTags } from '../html.js';
+import { SEARCH_RESULT_LIMIT } from '../constants.js';
 
 const BANGUMI_TYPE_LABELS = {
   1: '轻小说/书籍',
@@ -40,12 +41,15 @@ export async function searchBangumi(keyword, { signal, fetchImpl = fetch } = {})
     filter: { type: [1, 2, 4, 6], nsfw: false },
   };
 
-  const response = await fetchImpl(buildPreferredUrl('bangumi', '/v0/search/subjects?limit=12&offset=0'), {
-    method: 'POST',
-    signal,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const response = await fetchImpl(
+    buildPreferredUrl('bangumi', `/v0/search/subjects?limit=${SEARCH_RESULT_LIMIT}&offset=0`),
+    {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
 
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`.trim());

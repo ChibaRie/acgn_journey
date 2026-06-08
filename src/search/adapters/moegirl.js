@@ -1,5 +1,6 @@
 import { buildDirectUrl } from '../sources.js';
 import { getYear, normalizeUrl, stripHtml, uniqueTags } from '../html.js';
+import { SEARCH_RESULT_LIMIT } from '../constants.js';
 
 export function buildMoegirlParams(keyword) {
   return new URLSearchParams({
@@ -8,7 +9,7 @@ export function buildMoegirlParams(keyword) {
     formatversion: '2',
     generator: 'search',
     gsrnamespace: '0',
-    gsrlimit: '12',
+    gsrlimit: String(SEARCH_RESULT_LIMIT),
     gsrsearch: keyword,
     prop: 'extracts|pageimages|info|categories',
     exintro: '1',

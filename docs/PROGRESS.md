@@ -1,13 +1,13 @@
 # 项目进度记录
 
 > 最后更新：2026-06-08
-> 当前版本：`v0.7.7` ｜ 默认分支：`main` ｜ 远程：github.com/ChibaRie/acgn_journey
+> 当前版本：`v0.8` ｜ 默认分支：`main` ｜ 远程：github.com/ChibaRie/acgn_journey
 
 ## 当前状态
 
 | 项 | 状态 |
 |---|---|
-| 版本 | v0.7.7 |
+| 版本 | v0.8 |
 | 主要形态 | Electron 桌面软件 + 本机 SQLite |
 | 在线演示 | GitHub Pages |
 | 线上地址 | https://chibarie.github.io/acgn_journey/ |
@@ -15,6 +15,28 @@
 | 默认搜索源 | AGE动漫、萌娘百科、MangaBaka、Bangumi |
 | 截图识别 | trace.moe |
 | 数据持久化 | 本机 SQLite，浏览器 LocalStorage 作为 fallback |
+
+## v0.8 交付内容
+
+### 1. AI 用户画像实验
+
+- 新增 AI 画像入口，基于作品库聚合摘要生成结构化偏好画像。
+- 桌面模式支持 OpenAI-compatible LLM 配置与本机代理调用；Pages 仅提供 Prompt 预览和复制。
+- LLM 配置支持获取模型列表、测试连通性、一键清除，Prompt 预览默认折叠。
+- 默认温度为 `0.8`，用户确认前不会发起模型调用。
+- 默认不发送完整库、短评全文、作品简介、封面或来源链接，API Key 仅保存在本机 settings。
+
+### 2. 搜索结果扩容
+
+- 文字搜索结果上限从 12 条提升到 24 条。
+- AGE动漫、萌娘百科、MangaBaka 与 Bangumi adapter 共用统一结果数量常量。
+- 补充来源 adapter、搜索分发、AI 画像构建、本机 LLM 代理与 UI 相关测试。
+
+### 3. 文档、版本与测试同步
+
+- package 版本更新到 `0.8.0`，导出备份格式版本号同步更新到 `0.8.0`。
+- README、架构、部署与进度文档同步说明 AI 画像实验、Pages 调用边界和搜索结果扩容。
+- GitHub Actions Pages 部署测试环境同步使用 Node 24，以覆盖 `node:sqlite` 本机服务测试。
 
 ## v0.7.7 交付内容
 

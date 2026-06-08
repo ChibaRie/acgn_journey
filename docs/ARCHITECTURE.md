@@ -133,6 +133,9 @@ interface SearchWork {
 | `GET` | `/api/local/settings/:key` | 读取设置 |
 | `PUT` | `/api/local/settings/:key` | 写入设置 |
 | `DELETE` | `/api/local/settings/:key` | 删除设置 |
+| `POST` | `/api/local/ai/profile` | 桌面模式代理 OpenAI-compatible 用户画像请求 |
+| `POST` | `/api/local/ai/models` | 读取 OpenAI-compatible `/models` 并返回可选模型列表 |
+| `POST` | `/api/local/ai/test` | 使用当前 LLM 配置发起最小连通性测试 |
 
 前端策略：
 
@@ -141,8 +144,15 @@ interface SearchWork {
 - SQLite 为空但浏览器已有记录时，会迁移当前记录到 SQLite。
 - 后续变更优先保存到 SQLite，同时保留浏览器 fallback。
 - 背景与主题偏好同样优先写入本机设置表。
+- LLM 配置保存在本机 settings 的 `llm-profile`，API Key 不写入作品记录或备份；GitHub Pages 不启用真实 LLM 调用。
 
-## 6. 搜索架构
+## 6. AI 用户画像实验
+
+`src/utils/aiProfile.js` 将 `records + stats` 转为 `schemaVersion: 1` 的画像输入，只包含聚合统计和少量代表作品样本。默认剔除短评、简介、封面和来源链接。
+
+桌面模式通过 `/api/local/ai/profile` 调用用户配置的 OpenAI-compatible `/chat/completions`；`/api/local/ai/models` 和 `/api/local/ai/test` 分别用于模型列表获取与连通性测试。在线演示只能预览和复制 Prompt。
+
+## 7. 搜索架构
 
 `src/search/` 负责搜索来源适配：
 
@@ -162,14 +172,14 @@ src/search/
 策略：
 
 - UI 只维护一个当前来源。
-- `searchSource(sourceId, keyword)` 调度对应 adapter。
+- `searchSource(sourceId, keyword)` 调度对应 adapter，文字搜索结果上限统一为 24 条。
 - adapter 负责请求、解析 HTML/JSON，并归一化为 `SearchWork`。
 - AGE动漫、萌娘百科与 MangaBaka 由浏览器直连；其中 MangaBaka 使用支持 CORS 的官方 API，专用于轻小说检索，不经过 Worker。
 - Bangumi 优先使用可选代理，未配置代理时尝试官方 API 直连 fallback。
 - 当前来源失败时只显示当前来源错误，不再混合多个来源的失败信息。
 - trace.moe 截图识别独立于文字搜索来源。
 
-## 7. 主要组件
+## 8. 主要组件
 
 ```text
 App
@@ -181,6 +191,7 @@ App
   BulkImportPanel
   TimelinePanel
   StatsPanel
+  AiProfilePanel
   RecordEditor
   ConfirmModal
   SettingsPopover

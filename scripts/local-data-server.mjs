@@ -10,6 +10,9 @@ const APP_NAME = 'acgn_journey';
 const HOST = process.env.DATA_HOST || '127.0.0.1';
 const PORT = Number(process.env.DATA_PORT || 5198);
 const MAX_BODY_BYTES = Number(process.env.DATA_MAX_BODY_BYTES || 25 * 1024 * 1024);
+const LLM_PROFILE_SETTING_KEY = 'llm-profile';
+const LLM_REQUEST_TIMEOUT_MS = Number(process.env.LLM_PROFILE_TIMEOUT_MS || 30_000);
+const DEFAULT_LLM_TEMPERATURE = 0.8;
 
 const ALLOWED_ORIGINS = new Set([
   'https://chibarie.github.io',
@@ -94,7 +97,7 @@ function applyCors(request, response) {
     response.setHeader('Access-Control-Allow-Origin', origin);
     response.setHeader('Vary', 'Origin');
   }
-  response.setHeader('Access-Control-Allow-Methods', 'GET,PUT,DELETE,OPTIONS');
+  response.setHeader('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
   response.setHeader('Access-Control-Allow-Headers', 'Content-Type,Accept');
   response.setHeader('Access-Control-Max-Age', '86400');
 }
@@ -217,6 +220,268 @@ function getSetting(key) {
   };
 }
 
+function stringifyProfileInput(input) {
+  if (typeof input === 'string') return input.trim();
+  if (input == null) return '';
+  try {
+    return JSON.stringify(input);
+  } catch {
+    return String(input);
+  }
+}
+
+function getProfileMessages(payload) {
+  if (Array.isArray(payload?.messages) && payload.messages.length > 0) {
+    return payload.messages;
+  }
+
+  const profileText = stringifyProfileInput(payload?.profileInput);
+  if (!profileText) {
+    throw createHttpError(400, 'Missing profileInput or messages.');
+  }
+
+  return [{ role: 'user', content: profileText }];
+}
+
+function normalizeLlmProfileConfig(config, { requireModel = true } = {}) {
+  if (!config || typeof config !== 'object') {
+    throw createHttpError(422, 'Missing LLM profile configuration.');
+  }
+
+  const baseUrl = typeof config.baseUrl === 'string' ? config.baseUrl.trim() : '';
+  const model = typeof config.model === 'string' ? config.model.trim() : '';
+  const apiKey = typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
+  const temperature =
+    config.temperature == null || config.temperature === ''
+      ? DEFAULT_LLM_TEMPERATURE
+      : Number(config.temperature);
+
+  if (!baseUrl || !apiKey || (requireModel && !model)) {
+    throw createHttpError(
+      422,
+      requireModel
+        ? 'LLM profile configuration must include baseUrl, model, and apiKey.'
+        : 'LLM profile configuration must include baseUrl and apiKey.',
+    );
+  }
+  if (!Number.isFinite(temperature)) {
+    throw createHttpError(422, 'LLM profile configuration temperature must be a number.');
+  }
+
+  return { baseUrl, model, apiKey, temperature };
+}
+
+function getLlmProfileConfig(options) {
+  let setting;
+  try {
+    setting = getSetting(LLM_PROFILE_SETTING_KEY);
+  } catch {
+    throw createHttpError(422, 'LLM profile configuration must be valid JSON.');
+  }
+  return normalizeLlmProfileConfig(setting?.value, options);
+}
+
+function getLlmConfigFromPayload(payload, options) {
+  if (payload?.config && typeof payload.config === 'object') {
+    return normalizeLlmProfileConfig(payload.config, options);
+  }
+  return getLlmProfileConfig(options);
+}
+
+function scrubApiKey(text, apiKey) {
+  if (!text || !apiKey) return text;
+  return String(text).replaceAll(apiKey, '[redacted]');
+}
+
+async function readLlmError(response, apiKey) {
+  const text = scrubApiKey((await response.text()).slice(0, 1000), apiKey);
+  if (!text) return '';
+  try {
+    const payload = JSON.parse(text);
+    return scrubApiKey(payload?.error?.message || payload?.message || text, apiKey);
+  } catch {
+    return text;
+  }
+}
+
+async function requestAiProfile(messages) {
+  const config = getLlmProfileConfig();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
+  const url = `${config.baseUrl.replace(/\/$/, '')}/chat/completions`;
+  const body = {
+    model: config.model,
+    messages,
+    ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
+  };
+
+  try {
+    const llmResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!llmResponse.ok) {
+      const detail = await readLlmError(llmResponse, config.apiKey);
+      if (llmResponse.status === 401) {
+        throw createHttpError(401, detail || 'LLM authentication failed.');
+      }
+      if (llmResponse.status === 429) {
+        throw createHttpError(429, detail || 'LLM rate limit exceeded.');
+      }
+      if (llmResponse.status >= 500) {
+        throw createHttpError(502, detail || 'LLM provider is unavailable.');
+      }
+      throw createHttpError(422, detail || 'LLM provider rejected the request.');
+    }
+
+    const payload = await llmResponse.json();
+    const rawText = payload?.choices?.[0]?.message?.content;
+    if (typeof rawText !== 'string') {
+      throw createHttpError(502, 'LLM response did not include message content.');
+    }
+
+    return {
+      rawText,
+      model: payload?.model || config.model,
+      usage: payload?.usage || null,
+      createdAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw createHttpError(504, 'LLM request timed out.');
+    }
+    if (error.status) throw error;
+    throw createHttpError(502, 'LLM request failed.');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function normalizeModelList(payload) {
+  const models = Array.isArray(payload?.data) ? payload.data : [];
+  return models
+    .map((item) => {
+      if (typeof item === 'string') return { id: item, ownedBy: '' };
+      return {
+        id: String(item?.id || '').trim(),
+        ownedBy: String(item?.owned_by || item?.ownedBy || '').trim(),
+      };
+    })
+    .filter((item) => item.id)
+    .sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true }));
+}
+
+async function requestAiModels(payload = {}) {
+  const config = getLlmConfigFromPayload(payload, { requireModel: false });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
+  const url = `${config.baseUrl.replace(/\/$/, '')}/models`;
+
+  try {
+    const llmResponse = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      signal: controller.signal,
+    });
+
+    if (!llmResponse.ok) {
+      const detail = await readLlmError(llmResponse, config.apiKey);
+      if (llmResponse.status === 401) {
+        throw createHttpError(401, detail || 'LLM authentication failed.');
+      }
+      if (llmResponse.status === 429) {
+        throw createHttpError(429, detail || 'LLM rate limit exceeded.');
+      }
+      if (llmResponse.status >= 500) {
+        throw createHttpError(502, detail || 'LLM provider is unavailable.');
+      }
+      throw createHttpError(422, detail || 'LLM provider rejected the request.');
+    }
+
+    return {
+      models: normalizeModelList(await llmResponse.json()),
+      createdAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw createHttpError(504, 'LLM model list request timed out.');
+    }
+    if (error.status) throw error;
+    throw createHttpError(502, 'LLM model list request failed.');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function testAiProfileConnection(payload = {}) {
+  const config = getLlmConfigFromPayload(payload, { requireModel: true });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
+  const url = `${config.baseUrl.replace(/\/$/, '')}/chat/completions`;
+  const body = {
+    model: config.model,
+    messages: [
+      {
+        role: 'user',
+        content: '请用一句中文回复“连接正常”，用于测试模型连通性。',
+      },
+    ],
+    temperature: config.temperature,
+  };
+
+  try {
+    const llmResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!llmResponse.ok) {
+      const detail = await readLlmError(llmResponse, config.apiKey);
+      if (llmResponse.status === 401) {
+        throw createHttpError(401, detail || 'LLM authentication failed.');
+      }
+      if (llmResponse.status === 429) {
+        throw createHttpError(429, detail || 'LLM rate limit exceeded.');
+      }
+      if (llmResponse.status >= 500) {
+        throw createHttpError(502, detail || 'LLM provider is unavailable.');
+      }
+      throw createHttpError(422, detail || 'LLM provider rejected the request.');
+    }
+
+    const responsePayload = await llmResponse.json();
+    return {
+      ok: true,
+      rawText: responsePayload?.choices?.[0]?.message?.content || '',
+      model: responsePayload?.model || config.model,
+      usage: responsePayload?.usage || null,
+      createdAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw createHttpError(504, 'LLM connection test timed out.');
+    }
+    if (error.status) throw error;
+    throw createHttpError(502, 'LLM connection test failed.');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function setSetting(key, value) {
   const updatedAt = new Date().toISOString();
   setSettingStmt.run(key, JSON.stringify(value), updatedAt);
@@ -275,6 +540,23 @@ async function handleRequest(request, response) {
       });
       return;
     }
+  }
+
+  if (request.method === 'POST' && pathname === '/api/local/ai/profile') {
+    const payload = await readJsonBody(request);
+    const messages = getProfileMessages(payload);
+    sendJson(request, response, 200, await requestAiProfile(messages));
+    return;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/local/ai/models') {
+    sendJson(request, response, 200, await requestAiModels(await readJsonBody(request)));
+    return;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/local/ai/test') {
+    sendJson(request, response, 200, await testAiProfileConnection(await readJsonBody(request)));
+    return;
   }
 
   const settingKey = getSettingKey(pathname);

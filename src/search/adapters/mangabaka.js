@@ -1,4 +1,5 @@
 import { getYear, stripHtml, uniqueTags } from '../html.js';
+import { SEARCH_RESULT_LIMIT } from '../constants.js';
 
 const MANGABAKA_API = 'https://api.mangabaka.org/v1/series/search';
 const MANGABAKA_SITE = 'https://mangabaka.org';
@@ -145,7 +146,7 @@ export async function searchMangabaka(keyword, { signal, fetchImpl = fetch } = {
   const params = new URLSearchParams({
     q: keyword,
     type: 'novel',
-    limit: '10',
+    limit: String(SEARCH_RESULT_LIMIT),
   });
   const response = await fetchImpl(`${MANGABAKA_API}?${params}`, { signal });
 
@@ -159,6 +160,6 @@ export async function searchMangabaka(keyword, { signal, fetchImpl = fetch } = {
   const json = await response.json();
   return (Array.isArray(json?.data) ? json.data : [])
     .filter((item) => !isAdultMangabakaItem(item))
-    .slice(0, 10)
+    .slice(0, SEARCH_RESULT_LIMIT)
     .map(normalizeMangabakaItem);
 }

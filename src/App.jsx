@@ -11,6 +11,7 @@ import {
   PackageCheck,
   Search,
   Settings2,
+  Sparkles,
   Sun,
   Upload,
   UploadCloud,
@@ -21,6 +22,7 @@ import TraceMoePanel from './components/TraceMoePanel.jsx';
 import LibraryPanel from './components/LibraryPanel.jsx';
 import TimelinePanel from './components/TimelinePanel.jsx';
 import StatsPanel from './components/StatsPanel.jsx';
+import AiProfilePanel from './components/AiProfilePanel.jsx';
 import InventoryPanel from './components/InventoryPanel.jsx';
 import BulkImportPanel from './components/BulkImportPanel.jsx';
 import RecordEditor from './components/RecordEditor.jsx';
@@ -50,6 +52,7 @@ const TABS = [
   { id: 'import', label: '批量导入', icon: UploadCloud },
   { id: 'timeline', label: '历程', icon: Clock3 },
   { id: 'stats', label: '统计', icon: BarChart3 },
+  { id: 'ai-profile', label: 'AI画像', icon: Sparkles },
 ];
 
 function getInitialTheme() {
@@ -356,6 +359,15 @@ export default function App() {
         )}
 
         {activeTab === 'stats' && <StatsPanel records={records} stats={stats} />}
+
+        {activeTab === 'ai-profile' && (
+          <AiProfilePanel
+            records={records}
+            stats={stats}
+            storage={storage}
+            onToast={showToast}
+          />
+        )}
         </div>
       </main>
 

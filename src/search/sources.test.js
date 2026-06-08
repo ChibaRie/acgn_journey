@@ -13,9 +13,10 @@ describe('sources registry', () => {
     expect(SOURCES.map((source) => source.id)).toEqual([
       'age',
       'moegirl',
+      'mangabaka',
       'bangumi',
     ]);
-    expect(SOURCES.map((source) => source.accessLabel)).toEqual(['直连', '直连', '需代理']);
+    expect(SOURCES.map((source) => source.accessLabel)).toEqual(['直连', '直连', '直连', '需代理']);
   });
 
   it('defaults to the mainland-priority source and returns null for unknown source ids', () => {
@@ -25,12 +26,14 @@ describe('sources registry', () => {
 
   it('exports labels from the registry', () => {
     expect(SOURCE_LABELS.moegirl).toBe('萌娘百科');
+    expect(SOURCE_LABELS.mangabaka).toBe('MangaBaka');
     expect(SOURCE_LABELS.age).toBe('AGE动漫');
   });
 
   it('builds source proxy urls and rejects unknown source ids', () => {
     expect(buildSourceUrl('age', '/search?query=芙莉莲')).toBe('/api/sources/age/search?query=芙莉莲');
     expect(() => buildSourceUrl('moegirl', '/api.php')).toThrow('搜索源不支持代理');
+    expect(() => buildSourceUrl('mangabaka', '/v1/series/search')).toThrow('搜索源不支持代理');
     expect(() => buildSourceUrl('gugu', '/x')).toThrow('未知搜索源');
     expect(() => buildSourceUrl('evil', '/x')).toThrow('未知搜索源');
   });

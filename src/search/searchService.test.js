@@ -30,4 +30,21 @@ describe('searchSource', () => {
     expect(response).toEqual({ items: [], error: null });
     expect(calls).toEqual(['https://api.bgm.tv/v0/search/subjects?limit=12&offset=0']);
   });
+
+  it('dispatches MangaBaka searches to the direct novel endpoint', async () => {
+    const calls = [];
+    const response = await searchSource('mangabaka', '药屋少女的呢喃', {
+      fetchImpl: async (url) => {
+        calls.push(url);
+        return {
+          ok: true,
+          json: async () => ({ data: [] }),
+        };
+      },
+    });
+
+    expect(response).toEqual({ items: [], error: null });
+    expect(calls[0]).toContain('https://api.mangabaka.org/v1/series/search?');
+    expect(calls[0]).toContain('type=novel');
+  });
 });

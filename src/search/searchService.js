@@ -1,10 +1,12 @@
 import { getSourceById } from './sources.js';
 import { searchBangumi } from './adapters/bangumi.js';
 import { searchAge } from './adapters/age.js';
+import { searchMangabaka } from './adapters/mangabaka.js';
 import { searchMoegirl } from './adapters/moegirl.js';
 
 const SEARCHERS = {
   bangumi: searchBangumi,
+  mangabaka: searchMangabaka,
   moegirl: searchMoegirl,
   age: searchAge,
 };

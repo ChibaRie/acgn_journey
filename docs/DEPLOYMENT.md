@@ -83,9 +83,12 @@ GitHub Pages 只发布静态前端。它无法部署或启动 `scripts/local-dat
 
 - AGE动漫搜索页：`https://www.agedm.io/search?query=...`
 - 萌娘百科 MediaWiki API：`https://zh.moegirl.org.cn/api.php?origin=*`
+- MangaBaka 轻小说 API：`https://api.mangabaka.org/v1/series/search`
 - trace.moe 截图识别 API：`https://api.trace.moe/search?anilistInfo`
 
-Bangumi 在 UI 中标注为需代理；未配置 `VITE_API_BASE` 时，前端仍会尝试官方 API 直连 fallback。
+文字搜索源顺序为 AGE动漫、萌娘百科、MangaBaka、Bangumi；trace.moe 保持为独立的截图识别服务。AGE动漫、萌娘百科与 MangaBaka 均由浏览器直连，其中 MangaBaka 官方 API 支持 CORS，不经过项目 Worker。Bangumi 在 UI 中标注为需代理；未配置 `VITE_API_BASE` 时，前端仍会尝试官方 API 直连 fallback。
+
+MangaBaka 数据仅按非商业与署名要求使用，具体要求见 [MangaBaka Terms of Service](https://mangabaka.org/about/terms)。
 
 Cloudflare Worker 目前只作为可选 fallback，保留固定白名单路由：
 

@@ -21,6 +21,14 @@ export const SOURCES = [
     directBase: 'https://zh.moegirl.org.cn',
   },
   {
+    id: 'mangabaka',
+    label: 'MangaBaka',
+    accessLabel: '直连',
+    accessKind: 'direct',
+    description: '轻小说专用社区数据库，支持中文、日文与英文标题检索，并返回封面和结构化元数据。',
+    directBase: 'https://api.mangabaka.org',
+  },
+  {
     id: 'bangumi',
     label: 'Bangumi',
     accessLabel: '需代理',

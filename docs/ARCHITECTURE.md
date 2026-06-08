@@ -28,7 +28,8 @@ flowchart LR
   F --> D["本机数据服务<br/>127.0.0.1:5198"]
   D --> S["SQLite 数据库<br/>用户设备目录"]
   F --> L["LocalStorage fallback"]
-  F --> A["搜索来源<br/>AGE / 萌娘百科 / Bangumi / trace.moe"]
+  F --> A["文字搜索来源<br/>AGE / 萌娘百科 / MangaBaka / Bangumi"]
+  F --> T["截图识别<br/>trace.moe"]
 ```
 
 桌面模式启动链路：
@@ -153,6 +154,7 @@ src/search/
   adapters/
     age.js
     bangumi.js
+    mangabaka.js
     moegirl.js
     traceMoe.js
 ```
@@ -162,6 +164,8 @@ src/search/
 - UI 只维护一个当前来源。
 - `searchSource(sourceId, keyword)` 调度对应 adapter。
 - adapter 负责请求、解析 HTML/JSON，并归一化为 `SearchWork`。
+- AGE动漫、萌娘百科与 MangaBaka 由浏览器直连；其中 MangaBaka 使用支持 CORS 的官方 API，专用于轻小说检索，不经过 Worker。
+- Bangumi 优先使用可选代理，未配置代理时尝试官方 API 直连 fallback。
 - 当前来源失败时只显示当前来源错误，不再混合多个来源的失败信息。
 - trace.moe 截图识别独立于文字搜索来源。
 
@@ -226,6 +230,7 @@ acgn_journey/
 - 本机数据服务默认只监听 `127.0.0.1`。
 - CORS 只允许 loopback 与已知线上来源。
 - 搜索代理只保留固定白名单前缀，不接收任意上游 URL。
+- MangaBaka 数据仅用于非商业场景并保留来源署名，具体要求见 [MangaBaka Terms of Service](https://mangabaka.org/about/terms)。
 - 外部链接在 Electron 中通过系统浏览器打开。
 - 图片背景保存在本机设置中，不上传云端。
 

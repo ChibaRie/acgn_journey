@@ -1,20 +1,34 @@
 # 项目进度记录
 
-> 最后更新：2026-06-07
-> 当前版本：`v0.7.6` ｜ 默认分支：`main` ｜ 远程：github.com/ChibaRie/acgn_journey
+> 最后更新：2026-06-08
+> 当前版本：`v0.7.7` ｜ 默认分支：`main` ｜ 远程：github.com/ChibaRie/acgn_journey
 
 ## 当前状态
 
 | 项 | 状态 |
 |---|---|
-| 版本 | v0.7.6 |
+| 版本 | v0.7.7 |
 | 主要形态 | Electron 桌面软件 + 本机 SQLite |
 | 在线演示 | GitHub Pages |
 | 线上地址 | https://chibarie.github.io/acgn_journey/ |
 | 搜索模式 | 直连优先的 anime_trace 式单来源检索 |
-| 默认搜索源 | AGE动漫、萌娘百科、Bangumi |
+| 默认搜索源 | AGE动漫、萌娘百科、MangaBaka、Bangumi |
 | 截图识别 | trace.moe |
 | 数据持久化 | 本机 SQLite，浏览器 LocalStorage 作为 fallback |
+
+## v0.7.7 交付内容
+
+### 1. MangaBaka 轻小说搜索
+
+- 新增 MangaBaka 轻小说源，支持中文、日文与英文标题检索。
+- MangaBaka 使用支持 CORS 的官方 API，由浏览器直接访问，不加入 Worker 代理路由。
+- 当前文字搜索源顺序为 AGE动漫、萌娘百科、MangaBaka、Bangumi；trace.moe 继续独立负责截图识别。
+
+### 2. 条款、版本与测试同步
+
+- MangaBaka 数据仅按非商业与署名要求使用，具体要求见 [MangaBaka Terms of Service](https://mangabaka.org/about/terms)。
+- package 版本和导出备份版本号同步更新到 `0.7.7`。
+- README、架构与部署文档同步说明来源用途和浏览器直连/CORS 边界。
 
 ## v0.7.6 交付内容
 

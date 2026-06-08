@@ -2,7 +2,7 @@
 
 个人 ACGN 作品记录管理软件。v0.7 开始，项目不再只把数据存在浏览器里，而是提供 Electron 桌面入口：应用窗口、本机数据服务和 SQLite 数据库都运行在用户自己的设备上。GitHub Pages 仍保留为在线演示版，但长期记录建议使用桌面模式。
 
-当前版本：`v0.7.6`
+当前版本：`v0.7.7`
 
 ## 本地运行
 
@@ -66,12 +66,12 @@ npm run app
 | 状态与持久化 | `useLibrary` Hook + 本机 SQLite / 浏览器回退 | 本机优先写盘，在线演示可降级 |
 | 本地数据服务 | Node 24 + `node:sqlite` | 数据写入用户目录下的 SQLite 文件 |
 | 单元测试 | Vitest | 覆盖搜索归一化与代理路由逻辑 |
-| 数据源 | AGE动漫、萌娘百科、Bangumi、trace.moe | 作品文字检索 + 截图识别 |
+| 数据源 | AGE动漫、萌娘百科、MangaBaka、Bangumi；trace.moe | 作品文字检索 + 截图识别 |
 | 在线部署 | GitHub Pages + GitHub Actions | 保留演示入口 |
 
 ## 已实现功能
 
-- 单来源作品搜索：AGE动漫（直连）、萌娘百科（直连）、Bangumi（需代理/可 fallback）。
+- 单来源作品搜索：AGE动漫（直连）、萌娘百科（直连）、MangaBaka（轻小说、浏览器直连）、Bangumi（需代理/可 fallback）。
 - trace.moe 截图识别：可上传本地截图或粘贴图片 URL，返回番名、集数、时间点、相似度，并可加入我的库。
 - 我的库管理：支持列表/方块视图切换并记住上次选择；可编辑标题、类型、作品年份、状态、日期、评分、短评、标签，也支持批量选择筛选结果、批量修改状态和批量删除。
 - 我的库分类：支持按 Galgame、轻小说、动漫、漫画、其他和作品年份筛选。
@@ -95,7 +95,14 @@ python scripts/tag_wordcloud.py path\to\backup.json -o tag-wordcloud.html
 
 ## 更新记录
 
-### v0.7.6（当前）
+### v0.7.7（当前）
+
+- **MangaBaka 轻小说源**：新增中文、日文与英文标题检索，返回封面和结构化轻小说元数据。
+- **浏览器直连**：MangaBaka API 支持 CORS，前端直接访问官方 API，不经过项目 Worker。
+- **来源与条款同步**：文字搜索源更新为 AGE动漫、萌娘百科、MangaBaka、Bangumi；MangaBaka 数据按非商业与署名要求使用。
+- **版本同步**：package 与导出备份版本号更新到 `0.7.7`。
+
+### v0.7.6
 
 - **我的库视图切换**：新增列表和方块两种浏览方式，方块视图采用封面主导的响应式卡片布局。
 - **视图偏好记忆**：自动保存上次选择的作品库视图，并在下次进入时恢复。
@@ -154,8 +161,9 @@ python scripts/tag_wordcloud.py path\to\backup.json -o tag-wordcloud.html
 
 ## 数据来源
 
-- 作品数据默认来自 AGE动漫、萌娘百科与 Bangumi；截图识别来自 trace.moe。
+- 文字搜索源依次为 AGE动漫、萌娘百科、MangaBaka 与 Bangumi；trace.moe 保持为独立的截图识别服务。
 - AGE动漫的检索 URL 与首版解析思路参考 [anime_trace](https://github.com/linyi102/anime_trace) 的公开实现，并按本项目的 Web/CORS 架构重写。
+- MangaBaka 用于轻小说检索，浏览器通过支持 CORS 的官方 API 直连。本项目仅以非商业方式使用并注明 MangaBaka 数据来源，具体要求见 [MangaBaka Terms of Service](https://mangabaka.org/about/terms)。
 - trace.moe 接入参考 [soruly/trace.moe](https://github.com/soruly/trace.moe) 与公开 API 文档。
 
 ## 文档

@@ -15,6 +15,7 @@ describe('search api compatibility exports', () => {
     expect(SOURCES.map((source) => source.id)).toEqual([
       'age',
       'moegirl',
+      'mangabaka',
       'bangumi',
     ]);
     expect(getSourceById('nyafun')).toBeNull();

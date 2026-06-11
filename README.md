@@ -1,8 +1,36 @@
-# acgn_journey
+<div align="center">
+  <img src="./favicon.svg" width="96" alt="acgn_journey 图标">
 
-个人 ACGN 作品记录管理软件。v0.7 开始，项目不再只把数据存在浏览器里，而是提供 Electron 桌面入口：应用窗口、本机数据服务和 SQLite 数据库都运行在用户自己的设备上。GitHub Pages 仍保留为在线演示版，但长期记录建议使用桌面模式。
+  <h1>acgn_journey</h1>
 
-当前版本：`v0.8`
+  <p><strong>把看过、读过、玩过的作品，整理成一条可回看的 ACGN 旅程。</strong></p>
+
+  <p>
+    本地优先的个人作品库，支持作品搜索、列表与方块浏览、历程统计、实体收藏，
+    <br>
+    以及隐私可控的 AI 兴趣画像。
+  </p>
+
+  <p>
+    <img src="https://img.shields.io/badge/version-v0.8-ff646d?style=flat-square" alt="当前版本 v0.8">
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f81f7?style=flat-square" alt="MIT License"></a>
+    <img src="https://img.shields.io/badge/desktop-Electron_38-47848f?style=flat-square" alt="Electron 38">
+    <a href="https://github.com/ChibaRie/acgn_journey/actions/workflows/deploy.yml"><img src="https://github.com/ChibaRie/acgn_journey/actions/workflows/deploy.yml/badge.svg" alt="部署状态"></a>
+  </p>
+
+  <p>
+    <a href="https://chibarie.github.io/acgn_journey/"><strong>在线体验</strong></a>
+    &nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="#本地运行"><strong>桌面版启动</strong></a>
+    &nbsp;&nbsp;·&nbsp;&nbsp;
+    <a href="#已实现功能"><strong>功能一览</strong></a>
+  </p>
+</div>
+
+> [!IMPORTANT]
+> GitHub Pages 是静态演示版，数据会回退到浏览器 LocalStorage。长期使用建议运行桌面版，让作品库、设置和 LLM 配置保存在自己的设备上。
+
+---
 
 ## 本地运行
 

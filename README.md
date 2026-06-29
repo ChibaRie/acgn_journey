@@ -1,6 +1,4 @@
 <div align="center">
-  <img src="./favicon.svg" width="96" alt="acgn_journey 图标">
-
   <h1>acgn_journey</h1>
 
   <p><strong>把看过、读过、玩过的作品，整理成一条可回看的 ACGN 旅程。</strong></p>

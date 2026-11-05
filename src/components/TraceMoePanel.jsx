@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ImageUp, Link2, Loader2, Search, X } from 'lucide-react';
 import { searchTraceMoe } from '../api/search.js';
 import EmptyState from './EmptyState.jsx';
 import WorkCard from './WorkCard.jsx';
 
-export default function TraceMoePanel({ hasWork, onAddWork }) {
+export default function TraceMoePanel({ hasWork, onAddWork, readOnly = false }) {
   const [imageUrl, setImageUrl] = useState('');
   const [file, setFile] = useState(null);
   const [cutBorders, setCutBorders] = useState(true);
@@ -16,9 +16,22 @@ export default function TraceMoePanel({ hasWork, onAddWork }) {
   const fileInputRef = useRef(null);
   const abortRef = useRef(null);
 
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const resetSearch = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setLoading(false);
+    setSearched(false);
+    setResults([]);
+    setFrameCount(0);
+    setError('');
+  };
+
   const handleFileChange = (event) => {
     const nextFile = event.target.files?.[0] || null;
     if (!nextFile) return;
+    resetSearch();
     setFile(nextFile);
     setImageUrl('');
     setResults([]);
@@ -27,6 +40,7 @@ export default function TraceMoePanel({ hasWork, onAddWork }) {
   };
 
   const clearFile = () => {
+    resetSearch();
     setFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -52,10 +66,11 @@ export default function TraceMoePanel({ hasWork, onAddWork }) {
         { file, imageUrl: file ? '' : trimmedUrl, cutBorders },
         { signal: controller.signal },
       );
+      if (controller.signal.aborted || abortRef.current !== controller) return;
       setResults(response.items);
       setFrameCount(response.frameCount);
     } catch (error) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && !controller.signal.aborted && abortRef.current === controller) {
         setResults([]);
         setFrameCount(0);
         setError(`trace.moe 识别失败：${error.message || '服务暂时不可用'}`);
@@ -71,8 +86,7 @@ export default function TraceMoePanel({ hasWork, onAddWork }) {
     <section className="panel trace-panel" aria-labelledby="trace-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">截图识别</p>
-          <h2 id="trace-title">用 trace.moe 反查动画场景</h2>
+          <h2 id="trace-title">截图识别</h2>
         </div>
         {searched && frameCount > 0 && <span className="result-count">检索 {frameCount.toLocaleString()} 帧</span>}
       </div>
@@ -106,6 +120,7 @@ export default function TraceMoePanel({ hasWork, onAddWork }) {
           <input
             value={imageUrl}
             onChange={(event) => {
+              resetSearch();
               setImageUrl(event.target.value);
               if (event.target.value.trim()) clearFile();
             }}
@@ -117,7 +132,7 @@ export default function TraceMoePanel({ hasWork, onAddWork }) {
           <input
             type="checkbox"
             checked={cutBorders}
-            onChange={(event) => setCutBorders(event.target.checked)}
+            onChange={(event) => { resetSearch(); setCutBorders(event.target.checked); }}
           />
           <span>自动裁掉黑边</span>
         </label>
@@ -150,6 +165,7 @@ export default function TraceMoePanel({ hasWork, onAddWork }) {
               key={`${work.id}-${work.trace?.at || ''}`}
               work={work}
               isSaved={hasWork(work)}
+              readOnly={readOnly}
               onAddWork={onAddWork}
             />
           ))}

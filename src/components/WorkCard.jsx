@@ -1,21 +1,25 @@
-import { Check, ExternalLink, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, ExternalLink, ImageOff, Plus } from 'lucide-react';
 
-export default function WorkCard({ work, isSaved, onAddWork }) {
+export default function WorkCard({ work, isSaved, onAddWork, readOnly = false }) {
+  const [coverFailed, setCoverFailed] = useState(false);
+  useEffect(() => setCoverFailed(false), [work.cover]);
   const displayTags = work.animeTags?.length > 0 ? work.animeTags : work.tags || [];
 
   return (
     <article className="work-card">
       <div className="cover-frame">
-        {work.cover ? (
+        {work.cover && !coverFailed ? (
           <img
             src={work.cover}
             alt={`${work.title} 封面`}
             loading="lazy"
             referrerPolicy="no-referrer"
+            onError={() => setCoverFailed(true)}
           />
         ) : (
           <div className="cover-placeholder" aria-label="无封面">
-            {work.title.slice(0, 2)}
+            <ImageOff size={32} aria-hidden="true" />
           </div>
         )}
       </div>
@@ -49,7 +53,7 @@ export default function WorkCard({ work, isSaved, onAddWork }) {
           <button
             className={isSaved ? 'button saved' : 'button primary'}
             type="button"
-            disabled={isSaved}
+            disabled={isSaved || readOnly}
             onClick={() => onAddWork(work)}
           >
             {isSaved ? <Check size={16} /> : <Plus size={16} />}

@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Database, Loader2, Search, SlidersHorizontal } from 'lucide-react';
 import { DEFAULT_SOURCE_ID, SOURCES, getSourceById, searchSource } from '../api/search.js';
 import WorkCard from './WorkCard.jsx';
 import EmptyState from './EmptyState.jsx';
 
-export default function SearchPanel({ hasWork, onAddWork }) {
+export default function SearchPanel({ hasWork, onAddWork, readOnly = false }) {
   const [keyword, setKeyword] = useState('');
   const [sourceId, setSourceId] = useState(DEFAULT_SOURCE_ID);
   const [results, setResults] = useState([]);
@@ -14,13 +14,20 @@ export default function SearchPanel({ hasWork, onAddWork }) {
   const abortRef = useRef(null);
   const selectedSource = getSourceById(sourceId) || SOURCES[0];
 
-  const handleSourceChange = (nextSourceId) => {
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const resetSearch = () => {
     abortRef.current?.abort();
-    setSourceId(nextSourceId);
+    abortRef.current = null;
     setResults([]);
     setError('');
     setSearched(false);
     setLoading(false);
+  };
+
+  const handleSourceChange = (nextSourceId) => {
+    resetSearch();
+    setSourceId(nextSourceId);
   };
 
   const handleSubmit = async (event) => {
@@ -44,10 +51,11 @@ export default function SearchPanel({ hasWork, onAddWork }) {
 
     try {
       const response = await searchSource(sourceId, query, { signal: controller.signal });
+      if (controller.signal.aborted || abortRef.current !== controller) return;
       setResults(response.items);
       setError(response.error || '');
     } catch (error) {
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && !controller.signal.aborted && abortRef.current === controller) {
         setResults([]);
         setError(`${selectedSource.label} 搜索失败：${error.message || '来源暂时不可用'}`);
       }
@@ -62,8 +70,7 @@ export default function SearchPanel({ hasWork, onAddWork }) {
     <section className="panel search-panel" aria-labelledby="search-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">单来源作品搜索</p>
-          <h2 id="search-title">选择一个来源，再检索作品</h2>
+          <h2 id="search-title">作品搜索</h2>
         </div>
       </div>
 
@@ -99,7 +106,6 @@ export default function SearchPanel({ hasWork, onAddWork }) {
           ))}
         </div>
 
-        <p className="source-description">{selectedSource.description}</p>
       </div>
 
       <form className="search-form" onSubmit={handleSubmit}>
@@ -108,7 +114,7 @@ export default function SearchPanel({ hasWork, onAddWork }) {
           <span className="sr-only">搜索关键词</span>
           <input
             value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
+            onChange={(event) => { resetSearch(); setKeyword(event.target.value); }}
             placeholder="例如：葬送的芙莉莲、命运石之门、白色相簿2"
           />
         </label>
@@ -140,6 +146,7 @@ export default function SearchPanel({ hasWork, onAddWork }) {
               key={work.id}
               work={work}
               isSaved={hasWork(work)}
+              readOnly={readOnly}
               onAddWork={onAddWork}
             />
           ))}

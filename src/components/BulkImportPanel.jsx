@@ -1,27 +1,35 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, FileText, UploadCloud } from 'lucide-react';
 import EmptyState from './EmptyState.jsx';
 import ConfirmModal from './ConfirmModal.jsx';
 import { IMPORT_PROVIDERS, parseImportFile } from '../utils/importers.js';
 import { getStatusLabel } from '../utils/library.js';
 
-export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
+export default function BulkImportPanel({ onMergeRecords, onReplaceRecords, readOnly = false }) {
   const [provider, setProvider] = useState('auto');
   const [mode, setMode] = useState('merge');
   const [importResult, setImportResult] = useState(null);
   const [error, setError] = useState('');
   const [confirmReplaceOpen, setConfirmReplaceOpen] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const fileInputRef = useRef(null);
+  const parseVersion = useRef(0);
+
+  useEffect(() => () => { parseVersion.current += 1; }, []);
 
   const handleFileChange = async (event) => {
+    const version = ++parseVersion.current;
     const file = event.target.files?.[0];
     event.target.value = '';
     setError('');
     setImportResult(null);
+    setConfirmReplaceOpen(false);
+    setParsing(Boolean(file));
     if (!file) return;
 
     try {
       const result = await parseImportFile(file, provider);
+      if (version !== parseVersion.current) return;
       if (result.records.length === 0) {
         throw new Error('没有识别到可导入的作品记录，请检查 JSON 备份、文件表头或 XML 导出格式。');
       }
@@ -30,24 +38,26 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
         fileName: file.name,
       });
     } catch (parseError) {
-      setError(parseError.message || '文件解析失败');
+      if (version === parseVersion.current) setError(parseError.message || '文件解析失败');
+    } finally {
+      if (version === parseVersion.current) setParsing(false);
     }
   };
 
   const handleCommit = () => {
-    if (!importResult?.records.length) return;
+    if (!importResult?.records.length || readOnly || parsing) return;
 
     if (mode === 'replace') {
       setConfirmReplaceOpen(true);
     } else {
-      onMergeRecords(importResult.records);
+      if (onMergeRecords(importResult.records) === false) return;
       setImportResult(null);
     }
   };
 
   const handleConfirmReplace = () => {
-    if (!importResult?.records.length) return;
-    onReplaceRecords(importResult.records);
+    if (!importResult?.records.length || readOnly || parsing) return;
+    if (onReplaceRecords(importResult.records) === false) return;
     setConfirmReplaceOpen(false);
     setImportResult(null);
   };
@@ -56,8 +66,7 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
     <section className="panel" aria-labelledby="import-title">
       <div className="section-heading split">
         <div>
-          <p className="eyebrow">批量导入</p>
-          <h2 id="import-title">从 JSON、XML 或 CSV 导入作品库</h2>
+          <h2 id="import-title">批量导入</h2>
         </div>
         <div className="result-count">{importResult?.records.length || 0} 条待导入</div>
       </div>
@@ -70,7 +79,14 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
           <div className="import-controls">
             <label>
               <span>来源平台</span>
-              <select value={provider} onChange={(event) => setProvider(event.target.value)}>
+              <select value={provider} onChange={(event) => {
+                parseVersion.current += 1;
+                setProvider(event.target.value);
+                setImportResult(null);
+                setConfirmReplaceOpen(false);
+                setParsing(false);
+                setError('');
+              }}>
                 {IMPORT_PROVIDERS.map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
@@ -99,18 +115,6 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
           />
         </section>
 
-        <section className="api-sync-card" aria-label="授权 API 同步">
-          <p className="eyebrow">API 同步</p>
-          <h3>预留授权同步入口</h3>
-          <p>
-            Bangumi、MyAnimeList、AniList、VNDB 的账号同步通常需要 OAuth 或访问令牌。
-            当前前端版先完成离线文件导入；后续接 Express/Serverless 后，可以把授权回调和令牌安全保存放到后端。
-          </p>
-          <button className="button secondary" type="button" disabled>
-            <UploadCloud size={16} />
-            <span>等待后端授权模块</span>
-          </button>
-        </section>
       </div>
 
       {error && (
@@ -120,7 +124,9 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
         </div>
       )}
 
-      {!importResult && !error && (
+      {parsing && <p className="loading-state" role="status">正在解析文件…</p>}
+
+      {!importResult && !error && !parsing && (
         <EmptyState title="等待导入文件" description="导入前会先展示预览，你可以确认数量和关键字段后再合并或覆盖。" />
       )}
 
@@ -128,12 +134,12 @@ export default function BulkImportPanel({ onMergeRecords, onReplaceRecords }) {
         <section className="import-preview" aria-label="导入预览">
           <div className="section-heading split compact-heading">
             <div>
-              <p className="eyebrow">
+              <p className="import-file-info">
                 {importResult.providerLabel} · {importResult.fileName}
               </p>
               <h3>预览前 {Math.min(5, importResult.records.length)} 条记录</h3>
             </div>
-            <button className="button primary" type="button" onClick={handleCommit}>
+            <button className="button primary" type="button" onClick={handleCommit} disabled={readOnly || parsing}>
               <UploadCloud size={16} />
               <span>{mode === 'merge' ? '确认合并' : '确认覆盖'}</span>
             </button>

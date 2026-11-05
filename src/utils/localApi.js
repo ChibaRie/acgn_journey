@@ -55,7 +55,11 @@ async function requestJson(path, options = {}) {
     const text = await response.text();
     const payload = text ? JSON.parse(text) : null;
     if (!response.ok) {
-      throw new Error(payload?.error || `Local API request failed: ${response.status}`);
+      const error = new Error(payload?.error || `Local API request failed: ${response.status}`);
+      error.status = response.status;
+      error.code = payload?.code;
+      error.currentRevision = payload?.currentRevision;
+      throw error;
     }
     return payload;
   } finally {
@@ -71,10 +75,10 @@ export async function loadLocalRecords() {
   return requestJson('/api/local/records');
 }
 
-export async function saveLocalRecords(records) {
+export async function saveLocalRecords(records, revision) {
   return requestJson('/api/local/records', {
     method: 'PUT',
-    body: JSON.stringify({ records }),
+    body: JSON.stringify({ records, revision }),
     timeoutMs: 8000,
   });
 }

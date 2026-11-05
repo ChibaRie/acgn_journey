@@ -9,16 +9,9 @@ import {
 } from 'react';
 import {
   ArrowLeft,
-  CheckCircle2,
-  Clock3,
-  LayoutDashboard,
-  Library,
   Loader2,
   Moon,
-  PackageCheck,
-  Search,
   Settings2,
-  Sparkles,
   Sun,
 } from 'lucide-react';
 import { useLibrary } from './hooks/useLibrary.js';
@@ -49,12 +42,12 @@ const RecoveryDialog = lazy(() => import('./components/RecoveryDialog.jsx'));
 const THEME_KEY = 'acgn_journey:theme';
 const MOTION_KEY = 'acgn_journey:motion';
 const TABS = [
-  { id: 'overview', label: '总览', icon: LayoutDashboard },
-  { id: 'library', label: '作品库', icon: Library },
-  { id: 'discover', label: '发现', icon: Search },
-  { id: 'timeline', label: '历程', icon: Clock3 },
-  { id: 'inventory', label: '实体收藏', icon: PackageCheck },
-  { id: 'ai-profile', label: 'AI画像', icon: Sparkles },
+  { id: 'overview', label: '总览' },
+  { id: 'library', label: '作品库' },
+  { id: 'discover', label: '发现' },
+  { id: 'timeline', label: '历程' },
+  { id: 'inventory', label: '实体收藏' },
+  { id: 'ai-profile', label: 'AI画像' },
 ];
 
 function getInitialTheme() {
@@ -117,13 +110,20 @@ export default function App() {
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [pendingRecovery, setPendingRecovery] = useState(null);
   const toastTimer = useRef(null);
+  const backupReadVersion = useRef(0);
   const themeSaveQueue = useRef(Promise.resolve());
   const currentTheme = useRef(theme);
   currentTheme.current = theme;
-  const stats = useMemo(() => getStats(records), [records]);
+  const stats = useMemo(
+    () => (activeTab === 'ai-profile' ? getStats(records) : {}),
+    [records, activeTab]
+  );
   const detailedRecords = useMemo(
-    () => filterRecords(records, statsFilters || {}),
-    [records, statsFilters]
+    () =>
+      activeTab === 'overview' && showStats
+        ? filterRecords(records, statsFilters || {})
+        : [],
+    [records, statsFilters, activeTab, showStats]
   );
   const detailedStats = useMemo(
     () => getStats(detailedRecords),
@@ -136,7 +136,13 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(''), 3200);
   }, []);
 
-  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  useEffect(
+    () => () => {
+      window.clearTimeout(toastTimer.current);
+      backupReadVersion.current += 1;
+    },
+    []
+  );
   useEffect(() => {
     setRecoveryDismissed(false);
   }, [recovery]);
@@ -238,13 +244,15 @@ export default function App() {
     return true;
   };
   const importBackup = async (file) => {
+    const version = ++backupReadVersion.current;
+    setPendingBackup(null);
     try {
-      setPendingBackup({
-        records: readBackup(JSON.parse(await file.text())),
-        name: file.name,
-      });
+      const records = readBackup(JSON.parse(await file.text()));
+      if (version === backupReadVersion.current)
+        setPendingBackup({ records, name: file.name });
     } catch (error) {
-      notify(error.message || '备份读取失败');
+      if (version === backupReadVersion.current)
+        notify(error.message || '备份读取失败');
     }
   };
   const handleRecovery = async (source, id) => {
@@ -289,7 +297,6 @@ export default function App() {
         <div className="header-inner">
           <nav className="main-nav" aria-label="主导航">
             {TABS.map((tab) => {
-              const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
@@ -304,7 +311,6 @@ export default function App() {
                     if (tab.id === 'overview') setShowStats(false);
                   }}
                 >
-                  <Icon size={19} aria-hidden="true" />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -349,7 +355,7 @@ export default function App() {
             {saveStatus === 'checking' || saveStatus === 'saving' ? (
               <Loader2 size={16} className="spin" />
             ) : (
-              <CheckCircle2 size={16} />
+              <span className="save-status-dot" aria-hidden="true" />
             )}{' '}
             {statusText}
           </span>
@@ -521,7 +527,10 @@ export default function App() {
               initialView={settingsView}
               motionEnabled={motionEnabled}
               onMotionChange={setMotionEnabled}
-              onClose={() => setSettingsOpen(false)}
+              onClose={() => {
+                backupReadVersion.current += 1;
+                setSettingsOpen(false);
+              }}
               onToast={notify}
               onExport={(format) => downloadBackup(records, format)}
               onImportBackup={importBackup}

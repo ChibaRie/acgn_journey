@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { getStats, getTagSeries } from './stats.js';
 
 describe('tag statistics', () => {
+  it('includes valid decimal scores in the detailed rating distribution', () => {
+    const stats = getStats([
+      { rating: 8 },
+      { rating: 8.5 },
+      { rating: 9.25 },
+      { rating: 0 },
+      { rating: 11 },
+    ]);
+    expect(stats.ratedCount).toBe(3);
+    expect(stats.ratingSeries).toEqual([
+      { label: '8', value: 1 },
+      { label: '8.5', value: 1 },
+      { label: '9.25', value: 1 },
+    ]);
+  });
   it('counts user tags and source anime tags once per record', () => {
     const records = [
       { tags: ['百合', '百合'], animeTags: ['原创', '动画工房'] },

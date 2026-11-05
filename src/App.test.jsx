@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -120,5 +121,51 @@ test('offers the baseline and each recoverable browser copy explicitly', async (
   fireEvent.click(screen.getByRole('button', { name: '使用本机库' }));
   await waitFor(() =>
     expect(library.resolveRecovery).toHaveBeenCalledWith('baseline', undefined)
+  );
+});
+
+test('JSON recovery confirmation always follows the latest selected backup', async () => {
+  let resolveOld;
+  let resolveLatest;
+  const older = {
+    name: 'older.json',
+    text: () =>
+      new Promise((resolve) => {
+        resolveOld = resolve;
+      }),
+  };
+  const latest = {
+    name: 'latest.json',
+    text: () =>
+      new Promise((resolve) => {
+        resolveLatest = resolve;
+      }),
+  };
+  render(<App />);
+  fireEvent.click(screen.getByRole('button', { name: '数据与设置' }));
+  const dialog = await screen.findByRole('dialog', { name: '数据与设置' });
+  const input = dialog.querySelector('input[accept=".json,application/json"]');
+  fireEvent.change(input, { target: { files: [older] } });
+  fireEvent.change(input, { target: { files: [latest] } });
+  await act(async () =>
+    resolveLatest(
+      JSON.stringify({ records: [{ id: 'latest', title: '最新备份' }] })
+    )
+  );
+  await screen.findByText(/latest.json/);
+  await act(async () =>
+    resolveOld(JSON.stringify({ records: [{ id: 'old', title: '过期备份' }] }))
+  );
+  expect(screen.queryByText(/older.json/)).toBeNull();
+  expect(screen.getByText(/latest.json/)).toBeTruthy();
+  fireEvent.change(input, {
+    target: {
+      files: [{ name: 'broken.json', text: async () => 'invalid json' }],
+    },
+  });
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('dialog', { name: '覆盖当前作品库？' })
+    ).toBeNull()
   );
 });

@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { getLocalApiBase, loadLocalRecords, saveLocalRecords } from '../utils/localApi.js';
-import { createRecordFromWork, getWorkKey, normalizeRecord } from '../utils/library.js';
 import {
-  createRecordPackage, createWriterId, readLibraryCache,
-  removeRecordPackage, sameRecords, writeRecordPackage,
+  getLocalApiBase,
+  loadLocalRecords,
+  saveLocalRecords,
+} from '../utils/localApi.js';
+import {
+  createRecordFromWork,
+  getWorkKey,
+  normalizeRecord,
+} from '../utils/library.js';
+import {
+  createRecordPackage,
+  createWriterId,
+  readLibraryCache,
+  removeRecordPackage,
+  sameRecords,
+  writeRecordPackage,
 } from '../utils/libraryStorage.js';
 
 export function useLibrary() {
@@ -12,11 +24,27 @@ export function useLibrary() {
     const target = getLocalApiBase() || 'browser';
     const cache = readLibraryCache(target);
     controller.current = {
-      target, writer: createWriterId(), revision: null, baseline: cache.records,
-      queued: null, inFlight: null, mounted: false, recoveryPackages: [],
+      target,
+      writer: createWriterId(),
+      revision: null,
+      baseline: cache.records,
+      queued: null,
+      inFlight: null,
+      mounted: false,
+      recoveryPackages: [],
+      retiredPackages: new Map(),
       view: {
-        records: cache.records, canWrite: false, recovery: null,
-        storage: { mode: 'checking', type: 'browser', path: '', error: '', status: 'checking', cacheError: cache.error },
+        records: cache.records,
+        canWrite: false,
+        recovery: null,
+        storage: {
+          mode: 'checking',
+          type: 'browser',
+          path: '',
+          error: '',
+          status: 'checking',
+          cacheError: cache.error,
+        },
       },
     };
   }
@@ -33,7 +61,12 @@ export function useLibrary() {
   }
 
   function requireProtocol(payload) {
-    if (Array.isArray(payload?.records) && typeof payload.revision === 'string' && payload.revision.trim()) return payload;
+    if (
+      Array.isArray(payload?.records) &&
+      typeof payload.revision === 'string' &&
+      payload.revision.trim()
+    )
+      return payload;
     const error = new Error('本机服务协议需要更新，请更新后重新打开应用');
     error.code = 'LOCAL_PROTOCOL_REQUIRED';
     throw error;
@@ -60,9 +93,17 @@ export function useLibrary() {
   }
 
   function confirmCache(records) {
-    return cacheOperation(() => writeRecordPackage(createRecordPackage(
-      state.target, records, state.revision, 'saved',
-    )));
+    return cacheOperation(() =>
+      writeRecordPackage(
+        createRecordPackage(state.target, records, state.revision, 'saved')
+      )
+    );
+  }
+
+  function retirePackage(packet) {
+    const id = packet.id || packet.writer || packet.key;
+    if (id) state.retiredPackages.set(id, packet.contentVersion || packet.raw);
+    cacheOperation(() => removeRecordPackage(packet));
   }
 
   function showRecovery(baseline, candidates, status = 'conflict') {
@@ -72,8 +113,13 @@ export function useLibrary() {
       canWrite: false,
       recovery: {
         baselineRecords: baseline,
-        baselineLabel: state.view.storage.mode === 'local' ? '本机作品库' : '浏览器最近保存',
-        candidates: candidates.map(({ id, records, updatedAt }) => ({ id, records, updatedAt })),
+        baselineLabel:
+          state.view.storage.mode === 'local' ? '本机作品库' : '浏览器最近保存',
+        candidates: candidates.map(({ id, records, updatedAt }) => ({
+          id,
+          records,
+          updatedAt,
+        })),
       },
     });
     setStorage({ status });
@@ -83,20 +129,46 @@ export function useLibrary() {
     const cache = readLibraryCache(state.target);
     if (cache.error) setStorage({ cacheError: cache.error });
     const candidates = [...cache.candidates];
-    if (includeConfirmed && cache.confirmed && !sameRecords(cache.confirmed.records, baseline)) {
+    const confirmedNeedsChoice =
+      cache.confirmed &&
+      (cache.confirmed.status !== 'saved' ||
+        !cache.confirmed.revision ||
+        (baseline.length === 0 && cache.confirmed.records.length > 0));
+    if (
+      includeConfirmed &&
+      confirmedNeedsChoice &&
+      !sameRecords(cache.confirmed.records, baseline) &&
+      !candidates.some((item) =>
+        sameRecords(item.records, cache.confirmed.records)
+      )
+    ) {
       candidates.push({ ...cache.confirmed, id: 'confirmed' });
     }
-    if (state.queued && !candidates.some((item) => sameRecords(item.records, state.queued.records))) {
-      candidates.push({ ...state.queued, id: `${state.writer}:memory:${state.queued.contentVersion}` });
+    if (
+      state.queued &&
+      !candidates.some((item) =>
+        sameRecords(item.records, state.queued.records)
+      )
+    ) {
+      candidates.push({
+        ...state.queued,
+        id: `${state.writer}:memory:${state.queued.contentVersion}`,
+      });
     }
+    const unresolved = candidates.filter(
+      (item) =>
+        state.retiredPackages.get(item.id) !== (item.contentVersion || item.raw)
+    );
     return state.view.storage.mode === 'local'
-      ? candidates.filter((item) => !sameRecords(item.records, baseline))
-      : candidates;
+      ? unresolved.filter((item) => !sameRecords(item.records, baseline))
+      : unresolved;
   }
 
   function finishRecovery(records) {
-    const candidates = collectCandidates(records).filter((candidate) =>
-      candidate.id !== state.writer || !sameRecords(candidate.records, records),
+    const candidates = collectCandidates(records).filter(
+      (candidate) =>
+        candidate.id !== state.writer ||
+        !sameRecords(candidate.records, records)
     );
     if (candidates.length) {
       showRecovery(records, candidates);
@@ -111,9 +183,10 @@ export function useLibrary() {
     state.revision = payload.revision;
     state.baseline = packet.records;
     confirmCache(packet.records);
-    cacheOperation(() => removeRecordPackage(packet));
-    for (const candidate of packet.cleanup || []) cacheOperation(() => removeRecordPackage(candidate));
-    if (state.queued?.contentVersion === packet.contentVersion) state.queued = null;
+    retirePackage(packet);
+    for (const candidate of packet.cleanup || []) retirePackage(candidate);
+    if (state.queued?.contentVersion === packet.contentVersion)
+      state.queued = null;
     setStorage({ status: state.queued ? 'saving' : 'saved', error: '' });
     if (packet.cleanup) finishRecovery(packet.records);
   }
@@ -126,17 +199,25 @@ export function useLibrary() {
     // A timeout can hide a committed transaction. Read back before allowing
     // either a retry or a replacement of another window's revision.
     let payload;
-    try { payload = await readLocalRecords(); } catch (readError) {
+    try {
+      payload = await readLocalRecords();
+    } catch (readError) {
       if (readError.code === 'LOCAL_PROTOCOL_REQUIRED') {
         blockIncompatibleService(readError);
         return false;
       }
     }
-    if (payload && sameRecords(payload.records.map(normalizeRecord), packet.records)) {
+    if (
+      payload &&
+      sameRecords(payload.records.map(normalizeRecord), packet.records)
+    ) {
       acknowledge(packet, payload);
       return true;
     }
-    if (payload && (error.status === 409 || payload.revision !== state.revision)) {
+    if (
+      payload &&
+      (error.status === 409 || payload.revision !== state.revision)
+    ) {
       state.revision = payload.revision;
       const baseline = payload.records.map(normalizeRecord);
       showRecovery(baseline, collectCandidates(baseline));
@@ -144,7 +225,10 @@ export function useLibrary() {
     } else {
       setStorage({
         status: state.queued?.cached ? 'pending' : 'error',
-        error: error.status === 428 ? '本机服务需要更新，请导出备份后刷新应用' : error.message || '本机保存失败',
+        error:
+          error.status === 428
+            ? '本机服务需要更新，请导出备份后刷新应用'
+            : error.message || '本机保存失败',
       });
     }
     return false;
@@ -152,39 +236,54 @@ export function useLibrary() {
 
   function pump() {
     if (state.inFlight) return state.inFlight;
-    if (!state.queued || state.view.storage.mode !== 'local') return Promise.resolve();
+    if (!state.queued || state.view.storage.mode !== 'local')
+      return Promise.resolve();
     state.inFlight = (async () => {
       while (state.queued && state.mounted && !state.view.recovery) {
         const packet = state.queued;
         setStorage({ status: 'saving' });
         try {
-          const payload = await saveLocalRecords(packet.records, state.revision);
+          const payload = await saveLocalRecords(
+            packet.records,
+            state.revision
+          );
           acknowledge(packet, payload);
         } catch (error) {
           const accepted = await handleSaveFailure(packet, error);
           if (!accepted) break;
         }
       }
-    })().finally(() => { state.inFlight = null; });
+    })().finally(() => {
+      state.inFlight = null;
+    });
     return state.inFlight;
   }
 
   function enqueue(records, cleanupPackages) {
     setStorage({ cacheError: '' });
     const status = state.view.storage.mode === 'browser' ? 'saved' : 'pending';
-    const packet = createRecordPackage(state.target, records, state.revision, status, state.writer);
+    const packet = createRecordPackage(
+      state.target,
+      records,
+      state.revision,
+      status,
+      state.writer
+    );
     packet.cached = cacheOperation(() => writeRecordPackage(packet));
     packet.cleanup = cleanupPackages;
     state.queued = packet;
     if (state.view.storage.mode === 'local') return pump();
     const confirmed = confirmCache(records);
     if (packet.cached && confirmed) {
-      for (const candidate of cleanupPackages || []) cacheOperation(() => removeRecordPackage(candidate));
+      for (const candidate of cleanupPackages || []) retirePackage(candidate);
       state.queued = null;
       setStorage({ status: 'saved', error: '' });
       if (cleanupPackages) finishRecovery(records);
     } else {
-      setStorage({ status: 'error', error: '浏览器保存失败，请导出当前作品库' });
+      setStorage({
+        status: 'error',
+        error: '浏览器保存失败，请导出当前作品库',
+      });
     }
     return Promise.resolve();
   }
@@ -194,21 +293,36 @@ export function useLibrary() {
     let active = true;
     (async () => {
       let payload;
-      try { payload = await readLocalRecords(); } catch (error) {
+      try {
+        payload = await readLocalRecords();
+      } catch (error) {
         if (!active) return;
         if (error.code === 'LOCAL_PROTOCOL_REQUIRED') {
           blockIncompatibleService(error);
           return;
         }
-        setStorage({ mode: 'browser', type: 'localStorage', status: 'saved', error: error.message });
+        setStorage({
+          mode: 'browser',
+          type: 'localStorage',
+          status: 'saved',
+          error: error.message,
+        });
       }
       if (!active) return;
       if (payload) {
         state.revision = payload.revision;
-        setStorage({ mode: 'local', type: payload.storage?.type || 'sqlite', path: payload.storage?.path || '', status: 'saved', error: '' });
+        setStorage({
+          mode: 'local',
+          type: payload.storage?.type || 'sqlite',
+          path: payload.storage?.path || '',
+          status: 'saved',
+          error: '',
+        });
       }
       const cache = readLibraryCache(state.target);
-      const baseline = payload ? payload.records.map(normalizeRecord) : cache.records;
+      const baseline = payload
+        ? payload.records.map(normalizeRecord)
+        : cache.records;
       state.baseline = baseline;
       const candidates = collectCandidates(baseline, Boolean(payload));
       publish({ records: baseline });
@@ -218,7 +332,10 @@ export function useLibrary() {
         publish({ canWrite: true });
       }
     })();
-    return () => { active = false; state.mounted = false; };
+    return () => {
+      active = false;
+      state.mounted = false;
+    };
   }, []);
 
   function assertReady() {
@@ -236,38 +353,62 @@ export function useLibrary() {
     enqueue(records);
   }
 
-  const patchRecord = (record, patch) => normalizeRecord({
-    ...record, ...patch,
-    rating: patch.rating === undefined ? record.rating ?? 0 : Number(patch.rating),
-    updatedAt: new Date().toISOString(),
-  });
+  const patchRecord = (record, patch) =>
+    normalizeRecord({
+      ...record,
+      ...patch,
+      rating:
+        patch.rating === undefined
+          ? (record.rating ?? 0)
+          : Number(patch.rating),
+      updatedAt: new Date().toISOString(),
+    });
 
   const addWork = (work) => {
     assertReady();
-    const existing = state.view.records.find((record) => record.workKey === getWorkKey(work));
+    const existing = state.view.records.find(
+      (record) => record.workKey === getWorkKey(work)
+    );
     if (existing) return existing;
     const record = createRecordFromWork(work);
     mutate((current) => [record, ...current]);
     return record;
   };
-  const updateRecord = (id, patch) => mutate((current) => current.map((record) => record.id === id ? patchRecord(record, patch) : record));
-  const deleteRecord = (id) => mutate((current) => current.filter((record) => record.id !== id));
+  const updateRecord = (id, patch) =>
+    mutate((current) =>
+      current.map((record) =>
+        record.id === id ? patchRecord(record, patch) : record
+      )
+    );
+  const deleteRecord = (id) =>
+    mutate((current) => current.filter((record) => record.id !== id));
   const bulkUpdateRecords = (ids, patch) => {
     assertReady();
     const selected = new Set((ids || []).filter(Boolean));
-    if (selected.size) mutate((current) => current.map((record) => selected.has(record.id) ? patchRecord(record, patch) : record));
+    if (selected.size)
+      mutate((current) =>
+        current.map((record) =>
+          selected.has(record.id) ? patchRecord(record, patch) : record
+        )
+      );
   };
   const deleteRecords = (ids) => {
     assertReady();
     const selected = new Set((ids || []).filter(Boolean));
-    if (selected.size) mutate((current) => current.filter((record) => !selected.has(record.id)));
+    if (selected.size)
+      mutate((current) => current.filter((record) => !selected.has(record.id)));
   };
-  const replaceRecords = (records) => mutate(() => records.map(normalizeRecord));
-  const mergeRecords = (records) => mutate((current) => {
-    const merged = new Map(current.map((record) => [record.workKey || record.id, record]));
-    for (const record of records.map(normalizeRecord)) merged.set(record.workKey || record.id, record);
-    return [...merged.values()];
-  });
+  const replaceRecords = (records) =>
+    mutate(() => records.map(normalizeRecord));
+  const mergeRecords = (records) =>
+    mutate((current) => {
+      const merged = new Map(
+        current.map((record) => [record.workKey || record.id, record])
+      );
+      for (const record of records.map(normalizeRecord))
+        merged.set(record.workKey || record.id, record);
+      return [...merged.values()];
+    });
 
   async function resolveRecovery(source, candidateId) {
     if (!state.view.recovery || state.inFlight) return;
@@ -282,7 +423,8 @@ export function useLibrary() {
           return;
         }
       } catch (error) {
-        if (error.code === 'LOCAL_PROTOCOL_REQUIRED') blockIncompatibleService(error);
+        if (error.code === 'LOCAL_PROTOCOL_REQUIRED')
+          blockIncompatibleService(error);
         else setStorage({ status: 'error', error: error.message });
         return;
       }
@@ -298,13 +440,14 @@ export function useLibrary() {
         showRecovery(records, displayed, 'error');
         return;
       }
-      for (const candidate of displayed) cacheOperation(() => removeRecordPackage(candidate));
+      for (const candidate of displayed) retirePackage(candidate);
       setStorage({ status: 'saved', error: '' });
       finishRecovery(records);
       return;
     }
     const candidate = displayed.find((item) => item.id === candidateId);
-    if (source !== 'candidate' || !candidate) throw new Error('请选择有效的浏览器副本');
+    if (source !== 'candidate' || !candidate)
+      throw new Error('请选择有效的浏览器副本');
     publish({ records: candidate.records, recovery: null });
     await enqueue(candidate.records, displayed);
     if (!state.view.recovery && !state.queued) publish({ canWrite: true });
@@ -330,15 +473,28 @@ export function useLibrary() {
         await enqueue(state.queued.records, state.queued.cleanup);
       }
     } catch (error) {
-      if (error.code === 'LOCAL_PROTOCOL_REQUIRED') blockIncompatibleService(error);
-      else setStorage({ status: state.queued?.cached ? 'pending' : 'error', error: error.message });
+      if (error.code === 'LOCAL_PROTOCOL_REQUIRED')
+        blockIncompatibleService(error);
+      else
+        setStorage({
+          status: state.queued?.cached ? 'pending' : 'error',
+          error: error.message,
+        });
     }
   }
 
   return {
-    ...view, addWork, updateRecord, deleteRecord, bulkUpdateRecords,
-    deleteRecords, replaceRecords, mergeRecords,
-    hasWork: (work) => view.records.some((record) => record.workKey === getWorkKey(work)),
-    resolveRecovery, retrySave,
+    ...view,
+    addWork,
+    updateRecord,
+    deleteRecord,
+    bulkUpdateRecords,
+    deleteRecords,
+    replaceRecords,
+    mergeRecords,
+    hasWork: (work) =>
+      view.records.some((record) => record.workKey === getWorkKey(work)),
+    resolveRecovery,
+    retrySave,
   };
 }

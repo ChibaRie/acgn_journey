@@ -1,6 +1,15 @@
-import { getCalendarDate, getCalendarToday, shiftCalendarDate } from './dates.js';
+import {
+  getCalendarDate,
+  getCalendarToday,
+  shiftCalendarDate,
+} from './dates.js';
 import { WORK_CATEGORIES, getRecordYear, getWorkCategory } from './library.js';
-import { filterRecords, getStats, getTagSeries, isValidRating } from './stats.js';
+import {
+  filterRecords,
+  getSummaryStats,
+  getTagSeries,
+  isValidRating,
+} from './stats.js';
 
 function getMediaSeries(records) {
   const counts = new Map();
@@ -8,29 +17,44 @@ function getMediaSeries(records) {
     const category = getWorkCategory(record);
     counts.set(category, (counts.get(category) || 0) + 1);
   }
-  return WORK_CATEGORIES.filter(({ value }) => value !== 'all').map(({ value, label }) => ({
-    category: value, label, value: counts.get(value) || 0,
-  }));
+  return WORK_CATEGORIES.filter(({ value }) => value !== 'all').map(
+    ({ value, label }) => ({
+      category: value,
+      label,
+      value: counts.get(value) || 0,
+    })
+  );
 }
 
 function getCalendar(completed, year, today) {
   if (year !== 'all' && year > today.slice(0, 4)) {
     return { start: '', end: '', days: [], total: 0, future: true };
   }
-  const end = year === 'all' || year === today.slice(0, 4) ? today : `${year}-12-31`;
+  const end =
+    year === 'all' || year === today.slice(0, 4) ? today : `${year}-12-31`;
   const start = shiftCalendarDate(end, -181);
   const counts = new Map();
-  for (const { date } of completed) counts.set(date, (counts.get(date) || 0) + 1);
+  for (const { date } of completed)
+    counts.set(date, (counts.get(date) || 0) + 1);
   const days = Array.from({ length: 182 }, (_, index) => {
     const date = shiftCalendarDate(start, index);
     return { date, value: counts.get(date) || 0 };
   });
-  return { start, end, days, total: days.reduce((sum, day) => sum + day.value, 0), future: false };
+  return {
+    start,
+    end,
+    days,
+    total: days.reduce((sum, day) => sum + day.value, 0),
+    future: false,
+  };
 }
 
-export function getDashboardData(records, { category = 'all', year = 'all', today = getCalendarToday() } = {}) {
+export function getDashboardData(
+  records,
+  { category = 'all', year = 'all', today = getCalendarToday() } = {}
+) {
   const selected = filterRecords(records, { category, year });
-  const stats = getStats(selected);
+  const stats = getSummaryStats(selected);
   const completed = [];
   let missingCount = 0;
   let futureCount = 0;
@@ -58,37 +82,81 @@ export function getDashboardData(records, { category = 'all', year = 'all', toda
   } else if (year !== 'all') {
     trend = Array.from({ length: 12 }, (_, index) => {
       const label = String(index + 1).padStart(2, '0');
-      return { label, value: counts.get(label) || 0, future: `${year}-${label}` > today.slice(0, 7) };
+      return {
+        label,
+        value: counts.get(label) || 0,
+        future: `${year}-${label}` > today.slice(0, 7),
+      };
     });
   }
   const active = selected.filter((record) => record.status === 'active');
   const covers = (active.length ? active : selected)
     .map((record) => ({ record, updated: Date.parse(record.updatedAt) || 0 }))
-    .sort((a, b) => b.updated - a.updated || String(a.record.id).localeCompare(String(b.record.id)))
+    .sort(
+      (a, b) =>
+        b.updated - a.updated ||
+        String(a.record.id).localeCompare(String(b.record.id))
+    )
     .slice(0, 4)
     .map(({ record }) => record);
   return {
-    records: selected, stats, activeCount: active.length,
-    completedCount: completed.length, missingCount, futureCount, trend,
-    calendar: getCalendar(completed, year, today), media: getMediaSeries(selected),
-    covers, coverTitle: active.length ? '进行中的作品' : '最近更新的作品',
+    records: selected,
+    stats,
+    activeCount: active.length,
+    completedCount: completed.length,
+    missingCount,
+    futureCount,
+    trend,
+    calendar: getCalendar(completed, year, today),
+    media: getMediaSeries(selected),
+    covers,
+    coverTitle: active.length ? '进行中的作品' : '最近更新的作品',
     tags: stats.tagSeries.slice(0, 12),
-    years: Array.from(new Set(records.map(getRecordYear))).filter((value) => value !== '未设置').sort().reverse(),
+    years: Array.from(new Set(records.map(getRecordYear)))
+      .filter((value) => value !== '未设置')
+      .sort()
+      .reverse(),
   };
 }
 
-export function getAnnualReview(records, { category = 'all', year, today = getCalendarToday() } = {}) {
-  const completed = filterRecords(records, { category, completionYear: year, today });
+export function getAnnualReview(
+  records,
+  { category = 'all', year, today = getCalendarToday() } = {}
+) {
+  const completed = filterRecords(records, {
+    category,
+    completionYear: year,
+    today,
+  });
   const rated = completed.filter((record) => isValidRating(record.rating));
-  const top = [...rated].sort((a, b) =>
-    Number(b.rating) - Number(a.rating) || getCalendarDate(b.finishedAt).localeCompare(getCalendarDate(a.finishedAt)) || String(a.id).localeCompare(String(b.id)),
-  ).slice(0, 3);
-  return { total: completed.length, ratedCount: rated.length, top, media: getMediaSeries(completed), tags: getTagSeries(completed, 6) };
+  const top = [...rated]
+    .sort(
+      (a, b) =>
+        Number(b.rating) - Number(a.rating) ||
+        getCalendarDate(b.finishedAt).localeCompare(
+          getCalendarDate(a.finishedAt)
+        ) ||
+        String(a.id).localeCompare(String(b.id))
+    )
+    .slice(0, 3);
+  return {
+    total: completed.length,
+    ratedCount: rated.length,
+    top,
+    media: getMediaSeries(completed),
+    tags: getTagSeries(completed, 6),
+  };
 }
 
-export function drawWish(records, { category = 'all', previousId, random = Math.random } = {}) {
+export function drawWish(
+  records,
+  { category = 'all', previousId, random = Math.random } = {}
+) {
   const candidates = filterRecords(records, { category, status: 'wish' });
   if (candidates.length === 0) return null;
-  const pool = candidates.length > 1 ? candidates.filter((record) => record.id !== previousId) : candidates;
+  const pool =
+    candidates.length > 1
+      ? candidates.filter((record) => record.id !== previousId)
+      : candidates;
   return pool[Math.floor(random() * pool.length)];
 }

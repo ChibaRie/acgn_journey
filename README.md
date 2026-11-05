@@ -29,6 +29,7 @@
 > GitHub Pages 是静态演示版，数据会回退到浏览器 LocalStorage。长期使用建议运行桌面版，让作品库、设置和 LLM 配置保存在自己的设备上。
 
 > V0.9 开发中。本轮规划为二次元统计首页、前端重设计、持久化与交互修复，审计结果见 [V0.9 现状审计](docs/reviews/2026-11-05-v0.9-audit.md)。
+> [V0.9 交互草图](docs/prototypes/v0.9-dashboard-directions.html) 提供两种布局供视觉比较，可在浏览器中直接打开 HTML 文件。
 
 ---
 

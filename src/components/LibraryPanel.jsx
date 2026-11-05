@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckSquare,
   Edit3,
@@ -23,29 +23,99 @@ import {
 import { filterRecords } from '../utils/stats.js';
 import { loadLibraryView, saveLibraryView } from '../utils/libraryView.js';
 
+const DEFAULT_FILTERS = {
+  keyword: '',
+  category: 'all',
+  workYear: 'all',
+  status: '',
+};
+const PAGE_SIZE = 48;
+const LINKED_FILTERS = [
+  'year',
+  'tag',
+  'completionYear',
+  'completionMonth',
+  'completionDate',
+  'completionIssue',
+  'today',
+];
+
+function getFilterLabel(key, value) {
+  const labels = {
+    keyword: '关键词',
+    category: '分类',
+    workYear: '作品年份',
+    status: '状态',
+    year: '记录年份',
+    tag: '标签',
+    completionYear: '完成年份',
+    completionMonth: '完成月份',
+    completionDate: '完成日期',
+    completionIssue: '完成日期',
+  };
+  let display = value;
+  if (key === 'category')
+    display =
+      WORK_CATEGORIES.find((item) => item.value === value)?.label || value;
+  if (key === 'status') display = getStatusLabel(value);
+  if (key === 'completionIssue')
+    display = value === 'missing' ? '缺失或无效' : '未来日期待核对';
+  return `${labels[key] || key} ${display}`;
+}
+
 export default function LibraryPanel({
   records,
   onEditRecord,
   onDeleteRecord,
   onBulkUpdateRecords,
   onDeleteRecords,
+  externalFilters,
+  readOnly = false,
 }) {
-  const [filters, setFilters] = useState({
-    keyword: '',
-    category: 'all',
-    workYear: 'all',
-    status: '',
-  });
+  const [filters, setFilters] = useState(() => ({
+    ...DEFAULT_FILTERS,
+    ...externalFilters,
+  }));
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('');
   const [deleteDialog, setDeleteDialog] = useState(null);
   const [viewMode, setViewMode] = useState(loadLibraryView);
-  const filteredRecords = useMemo(() => filterRecords(records, filters), [records, filters]);
+  const [page, setPage] = useState(1);
+  const listRef = useRef(null);
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+  useEffect(() => {
+    if (!externalFilters) return;
+    setFilters((current) => {
+      const next = { ...current };
+      LINKED_FILTERS.forEach((key) => delete next[key]);
+      return { ...next, ...externalFilters };
+    });
+    setSelectedIds([]);
+  }, [externalFilters]);
+  const filteredRecords = useMemo(
+    () => filterRecords(records, filters),
+    [records, filters]
+  );
+  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageRecords = filteredRecords.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const visibleRecordIds = useMemo(() => filteredRecords.map((record) => record.id), [filteredRecords]);
-  const selectedVisibleCount = visibleRecordIds.filter((id) => selectedIdSet.has(id)).length;
-  const allVisibleSelected = visibleRecordIds.length > 0 && selectedVisibleCount === visibleRecordIds.length;
+  const visibleRecordIds = useMemo(
+    () => filteredRecords.map((record) => record.id),
+    [filteredRecords]
+  );
+  const selectedVisibleCount = visibleRecordIds.filter((id) =>
+    selectedIdSet.has(id)
+  ).length;
+  const allVisibleSelected =
+    visibleRecordIds.length > 0 &&
+    selectedVisibleCount === visibleRecordIds.length;
   const selectedCount = selectedIds.length;
 
   const categoryCounts = useMemo(
@@ -55,9 +125,11 @@ export default function LibraryPanel({
         count:
           category.value === 'all'
             ? records.length
-            : records.filter((record) => getWorkCategory(record) === category.value).length,
+            : records.filter(
+                (record) => getWorkCategory(record) === category.value
+              ).length,
       })),
-    [records],
+    [records]
   );
 
   const workYearCounts = useMemo(() => {
@@ -99,7 +171,9 @@ export default function LibraryPanel({
 
   const toggleRecordSelection = (id) => {
     setSelectedIds((current) =>
-      current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id],
+      current.includes(id)
+        ? current.filter((selectedId) => selectedId !== id)
+        : [...current, id]
     );
   };
 
@@ -115,14 +189,14 @@ export default function LibraryPanel({
   };
 
   const handleApplyStatus = () => {
-    if (!bulkStatus || selectedCount === 0) return;
+    if (readOnly || !bulkStatus || selectedCount === 0) return;
     onBulkUpdateRecords(selectedIds, { status: bulkStatus });
     setSelectedIds([]);
     setBulkStatus('');
   };
 
   const handleBulkDelete = () => {
-    if (selectedCount === 0) return;
+    if (readOnly || selectedCount === 0) return;
     setDeleteDialog({
       type: 'bulk',
       ids: [...selectedIds],
@@ -131,6 +205,7 @@ export default function LibraryPanel({
   };
 
   const confirmDelete = (record) => {
+    if (readOnly) return;
     setDeleteDialog({
       type: 'single',
       record,
@@ -142,7 +217,7 @@ export default function LibraryPanel({
   };
 
   const handleConfirmDelete = () => {
-    if (!deleteDialog) return;
+    if (readOnly || !deleteDialog) return;
 
     if (deleteDialog.type === 'bulk') {
       onDeleteRecords(deleteDialog.ids);
@@ -159,14 +234,17 @@ export default function LibraryPanel({
     <section className="panel" aria-labelledby="library-title">
       <div className="section-heading split">
         <div>
-          <p className="eyebrow">本地作品库</p>
-          <h2 id="library-title">按分类查看、编辑状态、评分、短评和标签</h2>
+          <h2 id="library-title">作品库</h2>
         </div>
         <div className="library-heading-actions">
           <div className="result-count">
             {filteredRecords.length} / {records.length}
           </div>
-          <div className="library-view-toggle" role="group" aria-label="作品库视图">
+          <div
+            className="library-view-toggle"
+            role="group"
+            aria-label="作品库视图"
+          >
             <button
               className={viewMode === 'list' ? 'active' : ''}
               type="button"
@@ -196,9 +274,12 @@ export default function LibraryPanel({
       {records.length > 0 && (
         <div className="bulk-toolbar" aria-label="批量管理">
           <button
-            className={bulkMode ? 'button secondary active' : 'button secondary'}
+            className={
+              bulkMode ? 'button secondary active' : 'button secondary'
+            }
             type="button"
             onClick={toggleBulkMode}
+            disabled={readOnly}
             aria-pressed={bulkMode}
           >
             {bulkMode ? <X size={16} /> : <CheckSquare size={16} />}
@@ -211,10 +292,16 @@ export default function LibraryPanel({
                 className="button secondary"
                 type="button"
                 onClick={toggleVisibleSelection}
-                disabled={visibleRecordIds.length === 0}
+                disabled={readOnly || visibleRecordIds.length === 0}
               >
-                {allVisibleSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                <span>{allVisibleSelected ? '取消当前筛选' : '选择当前筛选'}</span>
+                {allVisibleSelected ? (
+                  <CheckSquare size={16} />
+                ) : (
+                  <Square size={16} />
+                )}
+                <span>
+                  {allVisibleSelected ? '取消当前筛选' : '选择当前筛选'}
+                </span>
               </button>
 
               <div className="bulk-actions">
@@ -222,7 +309,7 @@ export default function LibraryPanel({
                 <select
                   value={bulkStatus}
                   onChange={(event) => setBulkStatus(event.target.value)}
-                  disabled={selectedCount === 0}
+                  disabled={readOnly || selectedCount === 0}
                   aria-label="批量修改状态"
                 >
                   <option value="">修改状态</option>
@@ -236,7 +323,7 @@ export default function LibraryPanel({
                   className="button primary"
                   type="button"
                   onClick={handleApplyStatus}
-                  disabled={!bulkStatus || selectedCount === 0}
+                  disabled={readOnly || !bulkStatus || selectedCount === 0}
                 >
                   <span>应用</span>
                 </button>
@@ -244,7 +331,7 @@ export default function LibraryPanel({
                   className="button danger"
                   type="button"
                   onClick={handleBulkDelete}
-                  disabled={selectedCount === 0}
+                  disabled={readOnly || selectedCount === 0}
                 >
                   <Trash2 size={16} />
                   <span>删除</span>
@@ -259,7 +346,11 @@ export default function LibraryPanel({
         {categoryCounts.map((category) => (
           <button
             key={category.value}
-            className={filters.category === category.value ? 'category-chip active' : 'category-chip'}
+            className={
+              filters.category === category.value
+                ? 'category-chip active'
+                : 'category-chip'
+            }
             type="button"
             onClick={() => updateFilter('category', category.value)}
             aria-pressed={filters.category === category.value}
@@ -275,7 +366,11 @@ export default function LibraryPanel({
         {workYearCounts.map((year) => (
           <button
             key={year.value}
-            className={filters.workYear === year.value ? 'category-chip active' : 'category-chip'}
+            className={
+              filters.workYear === year.value
+                ? 'category-chip active'
+                : 'category-chip'
+            }
             type="button"
             onClick={() => updateFilter('workYear', year.value)}
             aria-pressed={filters.workYear === year.value}
@@ -299,6 +394,7 @@ export default function LibraryPanel({
 
         <select
           value={filters.status}
+          aria-label="作品状态"
           onChange={(event) => updateFilter('status', event.target.value)}
         >
           <option value="">全部状态</option>
@@ -310,20 +406,61 @@ export default function LibraryPanel({
         </select>
       </div>
 
+      <div className="category-row" aria-label="已应用筛选">
+        {Object.entries(filters)
+          .filter(([key, value]) => key !== 'today' && value && value !== 'all')
+          .map(([key, value]) => (
+            <button
+              key={key}
+              className="category-chip active"
+              type="button"
+              aria-label={`清除${getFilterLabel(key, value)}`}
+              onClick={() =>
+                setFilters((current) => ({
+                  ...current,
+                  [key]: DEFAULT_FILTERS[key] || '',
+                }))
+              }
+            >
+              <span>{getFilterLabel(key, value)}</span>
+              <X size={16} aria-hidden="true" />
+            </button>
+          ))}
+        {Object.entries(filters).some(
+          ([key, value]) => key !== 'today' && value && value !== 'all'
+        ) && (
+          <button
+            className="button secondary"
+            type="button"
+            onClick={() => setFilters({ ...DEFAULT_FILTERS })}
+          >
+            清除全部筛选
+          </button>
+        )}
+      </div>
+
       {records.length === 0 && (
-        <EmptyState title="作品库还是空的" description="先去搜索页加入几部作品，时间线和统计会自动生成。" />
+        <EmptyState
+          title="作品库还是空的"
+          description="先去搜索页加入几部作品，时间线和统计会自动生成。"
+        />
       )}
 
       {records.length > 0 && filteredRecords.length === 0 && (
-        <EmptyState title="当前分类下没有记录" description="换一个分类、状态或关键词看看。" />
+        <EmptyState
+          title="当前分类下没有记录"
+          description="换一个分类、状态或关键词看看。"
+        />
       )}
 
       <div
+        ref={listRef}
         className={`library-list ${viewMode === 'grid' ? 'grid-view' : 'list-view'}`}
         data-view={viewMode}
       >
-        {filteredRecords.map((record) => {
-          const displayTags = record.tags.length > 0 ? record.tags : record.animeTags || [];
+        {pageRecords.map((record) => {
+          const displayTags =
+            record.tags.length > 0 ? record.tags : record.animeTags || [];
           const isSelected = selectedIdSet.has(record.id);
           return (
             <article
@@ -369,10 +506,14 @@ export default function LibraryPanel({
                       {record.type} · {record.source}
                     </p>
                   </div>
-                  <span className="status-pill">{getStatusLabel(record.status, record.type)}</span>
+                  <span className="status-pill">
+                    {getStatusLabel(record.status, record.type)}
+                  </span>
                 </div>
 
-                <p className="summary compact">{record.comment || record.summary || '暂无短评。'}</p>
+                <p className="summary compact">
+                  {record.comment || record.summary || '暂无短评。'}
+                </p>
 
                 <div className="record-meta">
                   <span>
@@ -382,7 +523,9 @@ export default function LibraryPanel({
                   <span>{getWorkYear(record)} 年</span>
                   <span className="record-tags">
                     <Tag size={15} />
-                    {displayTags.length > 0 ? displayTags.join(' / ') : '无标签'}
+                    {displayTags.length > 0
+                      ? displayTags.join(' / ')
+                      : '无标签'}
                   </span>
                 </div>
               </div>
@@ -391,7 +534,10 @@ export default function LibraryPanel({
                 <button
                   className="icon-button"
                   type="button"
-                  onClick={() => onEditRecord(record)}
+                  onClick={() => {
+                    if (!readOnly) onEditRecord(record);
+                  }}
+                  disabled={readOnly}
                   aria-label={`编辑 ${record.title}`}
                   title="编辑"
                 >
@@ -401,6 +547,7 @@ export default function LibraryPanel({
                   className="icon-button danger"
                   type="button"
                   onClick={() => confirmDelete(record)}
+                  disabled={readOnly}
                   aria-label={`删除 ${record.title}`}
                   title="删除"
                 >
@@ -412,10 +559,44 @@ export default function LibraryPanel({
         })}
       </div>
 
+      {pageCount > 1 && (
+        <nav className="pagination" aria-label="作品库分页">
+          <button
+            className="button secondary"
+            type="button"
+            disabled={currentPage === 1}
+            onClick={() => {
+              setPage(currentPage - 1);
+              listRef.current?.scrollIntoView?.({ block: 'start' });
+            }}
+          >
+            上一页
+          </button>
+          <span>
+            第 {currentPage} / {pageCount} 页 · {filteredRecords.length} 部作品
+          </span>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={currentPage === pageCount}
+            onClick={() => {
+              setPage(currentPage + 1);
+              listRef.current?.scrollIntoView?.({ block: 'start' });
+            }}
+          >
+            下一页
+          </button>
+        </nav>
+      )}
+
       {deleteDialog && (
         <ConfirmModal
           eyebrow="删除确认"
-          title={deleteDialog.type === 'bulk' ? '删除选中的记录？' : `删除《${deleteDialog.record.title}》？`}
+          title={
+            deleteDialog.type === 'bulk'
+              ? '删除选中的记录？'
+              : `删除《${deleteDialog.record.title}》？`
+          }
           description={
             deleteDialog.type === 'bulk'
               ? `将删除选中的 ${deleteDialog.count} 条记录。此操作不会影响你的本地备份文件。`

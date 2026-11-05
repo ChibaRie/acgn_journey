@@ -36,7 +36,7 @@ function collectRecordTags(record) {
   );
 }
 
-function TagCloud({ items, records }) {
+function TagCloud({ items, records, tagCount }) {
   const [selectedTag, setSelectedTag] = useState('');
   const max = Math.max(...items.map((item) => item.value), 1);
   const min = Math.min(...items.map((item) => item.value), max);
@@ -44,9 +44,7 @@ function TagCloud({ items, records }) {
 
   const selectedRecords = useMemo(() => {
     if (!selectedTag) return [];
-    return records
-      .filter((record) => collectRecordTags(record).includes(selectedTag))
-      .slice(0, 8);
+    return records.filter((record) => collectRecordTags(record).includes(selectedTag));
   }, [records, selectedTag]);
 
   return (
@@ -54,9 +52,8 @@ function TagCloud({ items, records }) {
       <div className="tag-cloud-heading">
         <div>
           <h3>标签词云</h3>
-          <p className="muted-text">来自用户标签与来源解析出的动漫标签，点击词条可查看关联作品。</p>
         </div>
-        <span>{items.length} 个标签</span>
+        <span>{tagCount} 个标签</span>
       </div>
 
       {items.length === 0 ? (
@@ -76,6 +73,7 @@ function TagCloud({ items, records }) {
                   style={{ '--tag-size': `${size.toFixed(2)}rem`, '--tag-weight': weight }}
                   title={`${item.label}：${item.value} 部作品`}
                   aria-pressed={active}
+                  aria-label={`${item.label} ${item.value}`}
                   onClick={() => setSelectedTag(active ? '' : item.label)}
                 >
                   <span>{item.label}</span>
@@ -92,10 +90,11 @@ function TagCloud({ items, records }) {
                   <strong>{selectedTag}</strong> 关联 {selectedRecords.length} 部作品
                 </p>
                 <div className="tag-cloud-records">
-                  {selectedRecords.map((record) => (
+                  {selectedRecords.slice(0, 8).map((record) => (
                     <span key={record.id}>{record.title}</span>
                   ))}
                 </div>
+                {selectedRecords.length > 8 && <p className="muted-text">预览前 8 部作品</p>}
               </>
             ) : (
               <p>选择一个标签，看看它对应了哪些收藏。</p>
@@ -113,8 +112,7 @@ export default function StatsPanel({ records, stats }) {
       <section className="panel" aria-labelledby="stats-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">统计面板</p>
-            <h2 id="stats-title">作品、类型、年份和评分分布</h2>
+            <h2 id="stats-title">作品分布</h2>
           </div>
         </div>
         <EmptyState title="暂无统计" description="添加作品并补充评分后，统计面板会自动更新。" />
@@ -126,8 +124,7 @@ export default function StatsPanel({ records, stats }) {
     <section className="panel" aria-labelledby="stats-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">统计面板</p>
-          <h2 id="stats-title">总览与分布</h2>
+          <h2 id="stats-title">作品分布</h2>
         </div>
       </div>
 
@@ -146,15 +143,16 @@ export default function StatsPanel({ records, stats }) {
           <Star size={20} />
           <span>平均评分</span>
           <strong>{stats.averageRating || '--'}</strong>
+          <span>{stats.ratedCount} 部评分样本</span>
         </article>
         <article className="stat-card accent-indigo">
           <Tags size={20} />
           <span>标签数量</span>
-          <strong>{stats.tagSeries?.length || 0}</strong>
+          <strong>{stats.tagCount || 0}</strong>
         </article>
       </div>
 
-      <TagCloud items={stats.tagSeries || []} records={records} />
+      <TagCloud items={stats.tagSeries || []} records={records} tagCount={stats.tagCount || 0} />
 
       <div className="stats-grid">
         <BarList title="类型分布" items={stats.typeSeries} />

@@ -5,6 +5,7 @@ import {
   getWorkYear,
   normalizeTags,
 } from './library.js';
+import { getCalendarDate, getCalendarToday } from './dates.js';
 
 function countBy(items, getKey) {
   return items.reduce((acc, item) => {
@@ -43,13 +44,16 @@ export function getTagSeries(records, limit = 60) {
 }
 
 export function getStats(records) {
-  const ratedRecords = records.filter((record) => Number(record.rating) > 0);
+  const ratedRecords = records.filter((record) => isValidRating(record.rating));
   const doneCount = records.filter((record) => record.status === 'done').length;
   const totalRating = ratedRecords.reduce((sum, record) => sum + Number(record.rating), 0);
+  const tags = getTagSeries(records, Infinity);
 
   return {
     total: records.length,
     doneCount,
+    ratedCount: ratedRecords.length,
+    tagCount: tags.length,
     averageRating: ratedRecords.length ? (totalRating / ratedRecords.length).toFixed(1) : '',
     typeSeries: toSeries(countBy(records, (record) => record.type)),
     statusSeries: toSeries(
@@ -57,7 +61,7 @@ export function getStats(records) {
     ),
     yearSeries: toSeries(countBy(records, getRecordYear)),
     workYearSeries: toSeries(countBy(records, getWorkYear)),
-    tagSeries: getTagSeries(records),
+    tagSeries: tags.slice(0, 60),
     ratingSeries: Array.from({ length: 10 }, (_, index) => {
       const score = index + 1;
       return {
@@ -68,7 +72,13 @@ export function getStats(records) {
   };
 }
 
-export function filterRecords(records, filters) {
+export function isValidRating(rating) {
+  const score = Number(rating);
+  return Number.isFinite(score) && score >= 1 && score <= 10;
+}
+
+export function filterRecords(records, filters = {}) {
+  const today = filters.today || getCalendarToday();
   return records.filter((record) => {
     const keyword = filters.keyword?.trim().toLowerCase();
     const titleMatch =
@@ -87,7 +97,21 @@ export function filterRecords(records, filters) {
       getWorkYear(record) === filters.workYear;
     const typeMatch = !filters.type || record.type === filters.type;
     const statusMatch = !filters.status || record.status === filters.status;
-    const yearMatch = !filters.year || getRecordYear(record) === filters.year;
-    return titleMatch && categoryMatch && workYearMatch && typeMatch && statusMatch && yearMatch;
+    const yearMatch = !filters.year || filters.year === 'all' || getRecordYear(record) === filters.year;
+    const tagMatch = !filters.tag || [...(record.tags || []), ...(record.animeTags || [])].includes(filters.tag);
+    if (!(titleMatch && categoryMatch && workYearMatch && typeMatch && statusMatch && yearMatch && tagMatch)) return false;
+
+    const hasCompletionFilter = filters.completionYear || filters.completionMonth || filters.completionDate || filters.completionIssue;
+    if (!hasCompletionFilter) return true;
+    if (record.status !== 'done') return false;
+    const date = getCalendarDate(record.finishedAt);
+    const completionMatches =
+      (!filters.completionYear || date.slice(0, 4) === String(filters.completionYear)) &&
+      (!filters.completionMonth || Number(date.slice(5, 7)) === Number(filters.completionMonth)) &&
+      (!filters.completionDate || date === filters.completionDate);
+    if (!completionMatches) return false;
+    if (filters.completionIssue === 'missing') return !date;
+    if (filters.completionIssue === 'future') return Boolean(date && date > today);
+    return Boolean(date && date <= today);
   });
 }

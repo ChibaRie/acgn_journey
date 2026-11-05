@@ -1,3 +1,5 @@
+import { getCalendarDate, getCalendarToday } from './dates.js';
+
 export const STORAGE_KEY = 'acgn_journey:records:v1';
 const LEGACY_STORAGE_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:records:v1`];
 export const BACKUP_VERSION = '0.9.0';
@@ -60,7 +62,7 @@ export function createId() {
 }
 
 export function getToday() {
-  return new Date().toISOString().slice(0, 10);
+  return getCalendarToday();
 }
 
 function getSearchText(input) {
@@ -102,8 +104,7 @@ export function getMedium(type = '') {
   return 'defaultLabel';
 }
 
-export function getWorkCategory(recordOrType) {
-  const normalized = getSearchText(recordOrType);
+function inferWorkCategory(normalized) {
 
   if (
     normalized.includes('galgame') ||
@@ -112,6 +113,10 @@ export function getWorkCategory(recordOrType) {
     normalized.includes('视觉小说')
   ) {
     return 'galgame';
+  }
+
+  if (normalized.includes('漫画') || normalized.includes('comic')) {
+    return 'comic';
   }
 
   if (
@@ -133,11 +138,15 @@ export function getWorkCategory(recordOrType) {
     return 'anime';
   }
 
-  if (normalized.includes('漫画') || normalized.includes('comic')) {
-    return 'comic';
-  }
-
   return 'other';
+}
+
+export function getWorkCategory(recordOrType) {
+  if (recordOrType && typeof recordOrType === 'object') {
+    const explicit = inferWorkCategory(getSearchText(recordOrType.type || ''));
+    if (explicit !== 'other') return explicit;
+  }
+  return inferWorkCategory(getSearchText(recordOrType));
 }
 
 export function getCategoryLabel(category) {
@@ -481,7 +490,9 @@ export function normalizeTags(value) {
 }
 
 export function getRecordYear(record) {
-  const sourceDate = record.finishedAt || record.startedAt || record.addedAt;
-  const year = sourceDate ? new Date(sourceDate).getFullYear() : NaN;
-  return Number.isFinite(year) ? String(year) : '未设置';
+  for (const value of [record.finishedAt, record.startedAt, record.addedAt]) {
+    const date = getCalendarDate(value);
+    if (date) return date.slice(0, 4);
+  }
+  return '未设置';
 }

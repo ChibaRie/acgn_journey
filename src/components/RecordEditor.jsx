@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Save, X } from 'lucide-react';
+import ModalDialog from './ModalDialog.jsx';
 import {
   INVENTORY_FORMATS,
   OPEN_STATUS_OPTIONS,
@@ -52,11 +53,9 @@ export default function RecordEditor({ record, onClose, onSave }) {
   };
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="editor-modal" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+    <ModalDialog titleId="editor-title" onClose={onClose} className="editor-modal">
         <div className="editor-header">
           <div>
-            <p className="eyebrow">编辑记录</p>
             <h2 id="editor-title">{record.title}</h2>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="关闭编辑器">
@@ -67,7 +66,7 @@ export default function RecordEditor({ record, onClose, onSave }) {
         <form className="editor-form" onSubmit={handleSubmit}>
           <label>
             <span>标题</span>
-            <input value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} />
+            <input value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} data-autofocus />
           </label>
 
           <div className="form-grid">
@@ -269,7 +268,6 @@ export default function RecordEditor({ record, onClose, onSave }) {
             </button>
           </div>
         </form>
-      </section>
-    </div>
+    </ModalDialog>
   );
 }

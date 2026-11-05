@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
+import ModalDialog from './ModalDialog.jsx';
 
 export default function ConfirmModal({
-  eyebrow = '确认操作',
   title,
   description,
   icon: Icon,
@@ -14,26 +14,18 @@ export default function ConfirmModal({
   const isDanger = tone === 'danger';
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <section
-        className="confirm-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-description"
-      >
+    <ModalDialog titleId="confirm-dialog-title" onClose={onCancel} className="confirm-modal">
         {Icon && (
           <div className={isDanger ? 'confirm-icon danger' : 'confirm-icon'} aria-hidden="true">
             <Icon size={22} />
           </div>
         )}
         <div className="confirm-content">
-          <p className="eyebrow">{eyebrow}</p>
           <h2 id="confirm-dialog-title">{title}</h2>
           <p id="confirm-dialog-description">{description}</p>
         </div>
         <div className="modal-actions">
-          <button className="button secondary" type="button" onClick={onCancel}>
+          <button className="button secondary" type="button" onClick={onCancel} data-autofocus>
             {cancelLabel}
           </button>
           <button
@@ -53,7 +45,6 @@ export default function ConfirmModal({
         >
           <X size={18} />
         </button>
-      </section>
-    </div>
+    </ModalDialog>
   );
 }

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, expect, test } from 'vitest';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -48,15 +49,17 @@ async function startMockLlm(handler) {
   };
 }
 
-async function startDataServer({ token = '' } = {}) {
+async function startDataServer({ token = '', databasePath, initializeDatabase } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'acgn-data-test-'));
+  const dbPath = databasePath || path.join(dataDir, 'test.sqlite');
+  initializeDatabase?.(dbPath);
   const port = await getFreePort();
   const child = spawn(process.execPath, [DATA_SERVER_SCRIPT], {
     cwd: ROOT,
     env: {
       ...process.env,
       ACGN_DATA_DIR: dataDir,
-      ACGN_DB_PATH: path.join(dataDir, 'test.sqlite'),
+      ACGN_DB_PATH: dbPath,
       ACGN_LOCAL_API_TOKEN: token,
       DATA_HOST: '127.0.0.1',
       DATA_PORT: String(port),
@@ -66,8 +69,11 @@ async function startDataServer({ token = '' } = {}) {
   });
 
   cleanup.push(async () => {
-    if (!child.killed) child.kill();
-    await new Promise((resolve) => child.once('exit', resolve));
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = new Promise((resolve) => child.once('exit', resolve));
+      child.kill();
+      await exited;
+    }
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -105,6 +111,135 @@ async function setLlmProfileConfig(baseUrl, value = {}) {
 afterEach(async () => {
   while (cleanup.length) {
     await cleanup.pop()();
+  }
+});
+
+async function readRecords(baseUrl) {
+  const response = await fetch(`${baseUrl}/api/local/records`);
+  expect(response.status).toBe(200);
+  return response.json();
+}
+
+function writeRecords(baseUrl, records, revision) {
+  return fetch(`${baseUrl}/api/local/records`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records, revision }),
+  });
+}
+
+test('health advertises revision protocol and empty snapshots have stable revisions', async () => {
+  const baseUrl = await startDataServer();
+  const health = await (await fetch(`${baseUrl}/api/local/health`)).json();
+  expect(health.recordsProtocolVersion).toBe(2);
+  const first = await readRecords(baseUrl);
+  expect(first.records).toEqual([]);
+  expect(first.revision).toEqual(expect.any(String));
+  expect(first.revision.length).toBeGreaterThan(0);
+  expect((await readRecords(baseUrl)).revision).toBe(first.revision);
+});
+
+test('legacy writes require a revision and leave the database untouched', async () => {
+  const baseUrl = await startDataServer();
+  const before = await readRecords(baseUrl);
+  for (const body of [{ records: [{ id: 'legacy' }] }, [{ id: 'legacy' }]]) {
+    const response = await fetch(`${baseUrl}/api/local/records`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    expect(response.status).toBe(428);
+    expect(await response.json()).toMatchObject({ code: 'REVISION_REQUIRED', error: expect.stringMatching(/export.*refresh.*import/i) });
+  }
+  expect(await readRecords(baseUrl)).toEqual(before);
+});
+
+test('successful writes preserve fields and reject stale replacement and empty migration', async () => {
+  const baseUrl = await startDataServer();
+  const empty = await readRecords(baseUrl);
+  const record = { id: 'one', title: 'First', source: 'manual', tags: ['tag'], status: 'done', score: 8, completedAt: '2025-01-01', physical: { format: 'book' } };
+  const response = await writeRecords(baseUrl, [record], empty.revision);
+  expect(response.status).toBe(200);
+  const saved = await response.json();
+  expect(saved.records[0]).toMatchObject(record);
+  expect(saved.revision).toEqual(expect.any(String));
+  expect(saved.revision).not.toBe(empty.revision);
+  for (const records of [[], [{ id: 'stale-migration' }]]) {
+    const stale = await writeRecords(baseUrl, records, empty.revision);
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ code: 'REVISION_CONFLICT', currentRevision: saved.revision, error: expect.any(String) });
+  }
+  expect((await readRecords(baseUrl)).records).toEqual(saved.records);
+  const cleared = await writeRecords(baseUrl, [], saved.revision);
+  expect(cleared.status).toBe(200);
+  expect((await cleared.json()).records).toEqual([]);
+});
+
+test('two connections writing the same revision only commit one snapshot', async () => {
+  let sharedPath;
+  const first = await startDataServer({ initializeDatabase(dbPath) { sharedPath = dbPath; } });
+  const second = await startDataServer({ databasePath: sharedPath });
+  const baseline = await readRecords(first);
+  const responses = await Promise.all([
+    writeRecords(first, [{ id: 'first' }], baseline.revision),
+    writeRecords(second, [{ id: 'second' }], baseline.revision),
+  ]);
+  expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+  const committed = await responses.find((response) => response.status === 200).json();
+  const conflict = await responses.find((response) => response.status === 409).json();
+  expect(conflict.currentRevision).toBe(committed.revision);
+  expect((await readRecords(second)).records).toEqual(committed.records);
+});
+
+test('invalid record replacement rolls back the entire transaction and revision', async () => {
+  const baseUrl = await startDataServer();
+  const initial = await readRecords(baseUrl);
+  const response = await writeRecords(baseUrl, [{ id: 'kept', title: 'Keep me' }], initial.revision);
+  const saved = await response.json();
+  const duplicate = await writeRecords(baseUrl, [{ id: 'duplicate' }, { id: 'duplicate' }], saved.revision);
+  expect(duplicate.ok).toBe(false);
+  const invalidArray = await writeRecords(baseUrl, {}, saved.revision);
+  expect(invalidArray.status).toBe(400);
+  const after = await readRecords(baseUrl);
+  expect(after.records).toEqual(saved.records);
+  expect(after.revision).toBe(saved.revision);
+});
+
+test('existing database payloads keep their fields, order and revision after restart', async () => {
+  let sharedPath;
+  const oldRecords = [{ id: 'old-b', title: 'Old B', custom: { kept: true } }, { id: 'old-a', tags: ['old'], score: 7 }];
+  const first = await startDataServer({ initializeDatabase(dbPath) {
+    sharedPath = dbPath;
+    const oldDb = new DatabaseSync(dbPath);
+    oldDb.exec('CREATE TABLE records (id TEXT PRIMARY KEY, work_key TEXT, payload TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, added_at TEXT, updated_at TEXT)');
+    const insert = oldDb.prepare('INSERT INTO records (id, payload, position) VALUES (?, ?, ?)');
+    oldRecords.forEach((record, index) => insert.run(record.id, JSON.stringify(record), index));
+    oldDb.close();
+  } });
+  const loaded = await readRecords(first);
+  expect(loaded.records).toEqual(oldRecords);
+  expect(loaded.revision).toEqual(expect.any(String));
+  const second = await startDataServer({ databasePath: sharedPath });
+  expect((await readRecords(second)).revision).toBe(loaded.revision);
+});
+
+test.each([
+  ['empty object', {}],
+  ['empty choices', { choices: [] }],
+  ['object content', { choices: [{ message: { content: {} } }] }],
+  ['array content', { choices: [{ message: { content: ['text'] } }] }],
+  ['empty text', { choices: [{ message: { content: '  ' } }] }],
+])('AI test and generation reject successful HTTP with %s', async (_label, upstreamPayload) => {
+  const llm = await startMockLlm(({ response }) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify(upstreamPayload));
+  });
+  const baseUrl = await startDataServer();
+  await setLlmProfileConfig(baseUrl, { baseUrl: llm.baseUrl });
+  for (const endpoint of ['test', 'profile']) {
+    const response = await fetch(`${baseUrl}/api/local/ai/${endpoint}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileInput: 'profile' }),
+    });
+    expect(response.status).toBe(502);
+    expect((await response.json()).error).toMatch(/message content/i);
   }
 });
 

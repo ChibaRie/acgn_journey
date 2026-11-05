@@ -6,6 +6,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isLocalDataServiceReady } from './local-data-service.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -241,10 +242,13 @@ async function start() {
 }
 
 async function startDataServer() {
+  if (await isLocalDataServiceReady(DATA_URL, LOCAL_API_TOKEN)) {
+    log(`Local data server already running at ${DATA_URL}.`);
+    return;
+  }
   const state = getDataState();
   if (state.kind === 'managed' || state.kind === 'unmanaged') {
-    log(`Local data server already running at ${DATA_URL} (PID ${state.pids.join(', ')}).`);
-    return;
+    fail(`Local data server process is running but unreachable at ${DATA_URL} (PID ${state.pids.join(', ')}).`);
   }
   if (state.kind === 'occupied') {
     fail(`Data port ${DATA_PORT} is used by another process (PID ${state.pids.join(', ')}).`);
@@ -270,13 +274,16 @@ async function startDataServer() {
   writePid(child.pid, DATA_PID_FILE);
 
   log(`Local data process started (PID ${child.pid}).`);
-  const ready = await waitForServer(`${DATA_URL}/api/local/health`, 15000);
-  if (ready) {
-    log(`Local data ready: ${DATA_URL}`);
-  } else {
-    log(`Local data still starting. Check ${path.relative(ROOT, DATA_LOG_FILE)}.`);
-  }
   child.unref();
+  const started = Date.now();
+  while (Date.now() - started < 15000) {
+    if (await isLocalDataServiceReady(DATA_URL, LOCAL_API_TOKEN)) {
+      log(`Local data ready: ${DATA_URL}`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  fail(`Local data service did not become ready. Check ${path.relative(ROOT, DATA_LOG_FILE)}.`);
 }
 
 async function startAppServer() {

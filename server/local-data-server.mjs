@@ -40,6 +40,7 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const db = new DatabaseSync(DB_PATH);
 db.exec(`
+  PRAGMA busy_timeout = 5000;
   PRAGMA journal_mode = WAL;
   PRAGMA foreign_keys = ON;
   CREATE TABLE IF NOT EXISTS records (
@@ -119,9 +120,10 @@ function sendEmpty(request, response, statusCode = 204) {
   response.end();
 }
 
-function createHttpError(status, message) {
+function createHttpError(status, message, details = {}) {
   const error = new Error(message);
   error.status = status;
+  Object.assign(error, details);
   return error;
 }
 
@@ -173,7 +175,20 @@ function listRecords() {
   return listRecordsStmt.all().map((row) => JSON.parse(row.payload));
 }
 
-function replaceRecords(records) {
+function getRecordsSnapshot() {
+  const records = listRecords();
+  const revision = createHash('sha256').update(JSON.stringify(records)).digest('hex');
+  return { records, revision };
+}
+
+function replaceRecords(records, revision) {
+  if (typeof revision !== 'string' || !revision.trim()) {
+    throw createHttpError(
+      428,
+      'A records revision is required. Export your current library as JSON, refresh to V0.9, then import the backup.',
+      { code: 'REVISION_REQUIRED' },
+    );
+  }
   if (!Array.isArray(records)) {
     throw createHttpError(400, 'Expected records to be an array.');
   }
@@ -181,6 +196,13 @@ function replaceRecords(records) {
   const normalized = records.map(normalizeRecordForStorage);
   db.exec('BEGIN IMMEDIATE');
   try {
+    const current = getRecordsSnapshot();
+    if (revision !== current.revision) {
+      throw createHttpError(409, 'The library changed since it was loaded. Read the current library before replacing it.', {
+        code: 'REVISION_CONFLICT',
+        currentRevision: current.revision,
+      });
+    }
     db.exec('DELETE FROM records');
     normalized.forEach((record, index) => {
       insertRecordStmt.run(
@@ -192,12 +214,13 @@ function replaceRecords(records) {
         record.updatedAt,
       );
     });
+    const saved = getRecordsSnapshot();
     db.exec('COMMIT');
+    return saved;
   } catch (error) {
     db.exec('ROLLBACK');
     throw error;
   }
-  return normalized;
 }
 
 function getRecordCount() {
@@ -306,6 +329,14 @@ async function readLlmError(response, apiKey) {
   }
 }
 
+function getLlmResponseText(payload) {
+  const rawText = payload?.choices?.[0]?.message?.content;
+  if (typeof rawText !== 'string' || !rawText.trim()) {
+    throw createHttpError(502, 'LLM response did not include non-empty text message content. Check the model and chat completions endpoint.');
+  }
+  return rawText;
+}
+
 async function requestAiProfile(messages) {
   const config = getLlmProfileConfig();
   const controller = new AbortController();
@@ -343,10 +374,7 @@ async function requestAiProfile(messages) {
     }
 
     const payload = await llmResponse.json();
-    const rawText = payload?.choices?.[0]?.message?.content;
-    if (typeof rawText !== 'string') {
-      throw createHttpError(502, 'LLM response did not include message content.');
-    }
+    const rawText = getLlmResponseText(payload);
 
     return {
       rawText,
@@ -468,7 +496,7 @@ async function testAiProfileConnection(payload = {}) {
     const responsePayload = await llmResponse.json();
     return {
       ok: true,
-      rawText: responsePayload?.choices?.[0]?.message?.content || '',
+      rawText: getLlmResponseText(responsePayload),
       model: responsePayload?.model || config.model,
       usage: responsePayload?.usage || null,
       createdAt: new Date().toISOString(),
@@ -526,6 +554,7 @@ async function handleRequest(request, response) {
       app: APP_NAME,
       recordCount: getRecordCount(),
       requiresToken: Boolean(LOCAL_API_TOKEN),
+      recordsProtocolVersion: 2,
       storage: storageInfo(),
     });
     return;
@@ -533,9 +562,10 @@ async function handleRequest(request, response) {
 
   if (pathname === '/api/local/records') {
     if (request.method === 'GET') {
+      const snapshot = getRecordsSnapshot();
       sendJson(request, response, 200, {
-        records: listRecords(),
-        recordCount: getRecordCount(),
+        ...snapshot,
+        recordCount: snapshot.records.length,
         storage: storageInfo(),
       });
       return;
@@ -543,11 +573,10 @@ async function handleRequest(request, response) {
 
     if (request.method === 'PUT') {
       const payload = await readJsonBody(request);
-      const records = Array.isArray(payload) ? payload : payload?.records;
-      const savedRecords = replaceRecords(records);
+      const saved = replaceRecords(payload?.records, payload?.revision);
       sendJson(request, response, 200, {
-        records: savedRecords,
-        recordCount: savedRecords.length,
+        ...saved,
+        recordCount: saved.records.length,
         storage: storageInfo(),
         savedAt: new Date().toISOString(),
       });
@@ -605,6 +634,8 @@ const server = http.createServer((request, response) => {
     const status = Number(error.status || 500);
     sendJson(request, response, status, {
       error: error.message || 'Internal server error.',
+      ...(error.code === 'REVISION_REQUIRED' || error.code === 'REVISION_CONFLICT' ? { code: error.code } : {}),
+      ...(error.currentRevision ? { currentRevision: error.currentRevision } : {}),
     });
   });
 });

@@ -6,6 +6,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isLocalDataServiceReady } from './local-data-service.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -138,14 +139,7 @@ async function waitFor(check, timeoutMs = 30000) {
 }
 
 async function isDataReady() {
-  const response = await requestText(`${DATA_URL}/api/local/health`);
-  if (!response.ok) return false;
-  try {
-    const payload = JSON.parse(response.text);
-    return payload.ok === true && payload.app === 'acgn_journey';
-  } catch {
-    return false;
-  }
+  return isLocalDataServiceReady(DATA_URL, LOCAL_API_TOKEN);
 }
 
 async function isAppReady() {

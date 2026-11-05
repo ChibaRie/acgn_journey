@@ -13,7 +13,7 @@ function groupByYear(records) {
   }, {});
 }
 
-export default function TimelinePanel({ records, onEditRecord }) {
+export default function TimelinePanel({ records, onEditRecord, readOnly = false }) {
   const [filters, setFilters] = useState({ year: '', type: '', status: '' });
   const years = useMemo(
     () => [...new Set(records.map(getRecordYear))].sort((a, b) => b.localeCompare(a)),
@@ -37,8 +37,7 @@ export default function TimelinePanel({ records, onEditRecord }) {
     <section className="panel" aria-labelledby="timeline-title">
       <div className="section-heading split">
         <div>
-          <p className="eyebrow">个人历程</p>
-          <h2 id="timeline-title">按完成时间沉淀你的 ACGN 轨迹</h2>
+          <h2 id="timeline-title">个人历程</h2>
         </div>
         <div className="result-count">{filtered.length} 条</div>
       </div>
@@ -112,6 +111,7 @@ export default function TimelinePanel({ records, onEditRecord }) {
                           className="icon-button"
                           type="button"
                           onClick={() => onEditRecord(record)}
+                      disabled={readOnly}
                           aria-label={`编辑 ${record.title}`}
                           title="编辑"
                         >

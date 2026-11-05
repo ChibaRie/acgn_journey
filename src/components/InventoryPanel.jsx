@@ -14,7 +14,7 @@ function parsePrice(value) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
-export default function InventoryPanel({ records, onEditRecord, onUpdateRecord }) {
+export default function InventoryPanel({ records, onEditRecord, onUpdateRecord, readOnly = false }) {
   const [filters, setFilters] = useState({
     keyword: '',
     format: '',
@@ -72,6 +72,7 @@ export default function InventoryPanel({ records, onEditRecord, onUpdateRecord }
   };
 
   const handleQuickAdd = () => {
+    if (readOnly) return;
     const record = records.find((item) => item.id === selectedRecordId) || availableRecords[0];
     if (!record) return;
     onUpdateRecord(record.id, {
@@ -87,8 +88,7 @@ export default function InventoryPanel({ records, onEditRecord, onUpdateRecord }
     <section className="panel" aria-labelledby="inventory-title">
       <div className="section-heading split">
         <div>
-          <p className="eyebrow">实体库存</p>
-          <h2 id="inventory-title">轻小说、BD、游戏光盘与实体藏品数据库</h2>
+          <h2 id="inventory-title">实体收藏</h2>
         </div>
         <div className="result-count">
           {filteredRecords.length} / {inventoryRecords.length}
@@ -123,7 +123,7 @@ export default function InventoryPanel({ records, onEditRecord, onUpdateRecord }
           <select
             value={selectedRecordId}
             onChange={(event) => setSelectedRecordId(event.target.value)}
-            disabled={availableRecords.length === 0}
+            disabled={readOnly || availableRecords.length === 0}
           >
             <option value="">
               {availableRecords.length > 0 ? '选择作品加入实体库存' : '所有作品都已在实体库存中'}
@@ -138,7 +138,7 @@ export default function InventoryPanel({ records, onEditRecord, onUpdateRecord }
             className="button secondary"
             type="button"
             onClick={handleQuickAdd}
-            disabled={availableRecords.length === 0}
+            disabled={readOnly || availableRecords.length === 0}
           >
             <PackageCheck size={16} />
             <span>设为实体藏品</span>
@@ -204,13 +204,14 @@ export default function InventoryPanel({ records, onEditRecord, onUpdateRecord }
             <article className="inventory-card" key={record.id}>
               <div className="inventory-card-head">
                 <div>
-                  <p className="eyebrow">{getInventoryFormatLabel(inventory.format)}</p>
+                  <p className="inventory-format">{getInventoryFormatLabel(inventory.format)}</p>
                   <h3>{record.title}</h3>
                 </div>
                 <button
                   className="icon-button"
                   type="button"
                   onClick={() => onEditRecord(record)}
+                  disabled={readOnly}
                   aria-label={`编辑 ${record.title} 的实体库存`}
                   title="编辑"
                 >

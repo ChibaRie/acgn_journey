@@ -1,109 +1,157 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BarChart3,
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  ArrowLeft,
+  CheckCircle2,
   Clock3,
-  Download,
-  ExternalLink,
-  Github,
-  Image as ImageIcon,
+  LayoutDashboard,
   Library,
+  Loader2,
   Moon,
   PackageCheck,
   Search,
   Settings2,
   Sparkles,
   Sun,
-  Upload,
-  UploadCloud,
-  X,
 } from 'lucide-react';
-import SearchPanel from './components/SearchPanel.jsx';
-import TraceMoePanel from './components/TraceMoePanel.jsx';
-import LibraryPanel from './components/LibraryPanel.jsx';
-import TimelinePanel from './components/TimelinePanel.jsx';
-import StatsPanel from './components/StatsPanel.jsx';
-import AiProfilePanel from './components/AiProfilePanel.jsx';
-import InventoryPanel from './components/InventoryPanel.jsx';
-import BulkImportPanel from './components/BulkImportPanel.jsx';
-import RecordEditor from './components/RecordEditor.jsx';
-import ConfirmModal from './components/ConfirmModal.jsx';
 import { useLibrary } from './hooks/useLibrary.js';
 import { useBackground } from './hooks/useBackground.js';
-import { getStats } from './utils/stats.js';
+import { getStats, filterRecords } from './utils/stats.js';
 import {
-  EXPORT_FORMATS,
   createExportText,
-  getDoneLabel,
   getExportFileName,
   getExportMimeType,
+  getDoneLabel,
   readBackup,
 } from './utils/library.js';
-import { readImageFile } from './utils/background.js';
 import { loadLocalSetting, saveLocalSetting } from './utils/localApi.js';
 
-const THEME_KEY = 'acgn_journey:theme';
-const LEGACY_THEME_KEYS = [`${['my', 'acgn', 'journey'].join('-')}:theme`];
+const Dashboard = lazy(() => import('./components/Dashboard.jsx'));
+const LibraryPanel = lazy(() => import('./components/LibraryPanel.jsx'));
+const SearchPanel = lazy(() => import('./components/SearchPanel.jsx'));
+const TraceMoePanel = lazy(() => import('./components/TraceMoePanel.jsx'));
+const TimelinePanel = lazy(() => import('./components/TimelinePanel.jsx'));
+const StatsPanel = lazy(() => import('./components/StatsPanel.jsx'));
+const InventoryPanel = lazy(() => import('./components/InventoryPanel.jsx'));
+const AiProfilePanel = lazy(() => import('./components/AiProfilePanel.jsx'));
+const SettingsDialog = lazy(() => import('./components/SettingsDialog.jsx'));
+const RecordEditor = lazy(() => import('./components/RecordEditor.jsx'));
+const ConfirmModal = lazy(() => import('./components/ConfirmModal.jsx'));
+const RecoveryDialog = lazy(() => import('./components/RecoveryDialog.jsx'));
 
+const THEME_KEY = 'acgn_journey:theme';
+const MOTION_KEY = 'acgn_journey:motion';
 const TABS = [
-  { id: 'search', label: '搜索', icon: Search },
-  { id: 'trace', label: '截图识别', icon: ImageIcon },
-  { id: 'library', label: '我的库', icon: Library },
-  { id: 'inventory', label: '实体库存', icon: PackageCheck },
-  { id: 'import', label: '批量导入', icon: UploadCloud },
+  { id: 'overview', label: '总览', icon: LayoutDashboard },
+  { id: 'library', label: '作品库', icon: Library },
+  { id: 'discover', label: '发现', icon: Search },
   { id: 'timeline', label: '历程', icon: Clock3 },
-  { id: 'stats', label: '统计', icon: BarChart3 },
+  { id: 'inventory', label: '实体收藏', icon: PackageCheck },
   { id: 'ai-profile', label: 'AI画像', icon: Sparkles },
 ];
 
 function getInitialTheme() {
-  const savedTheme =
-    localStorage.getItem(THEME_KEY) ||
-    LEGACY_THEME_KEYS.map((key) => localStorage.getItem(key)).find(Boolean);
-  if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  try {
+    const theme =
+      localStorage.getItem(THEME_KEY) ||
+      localStorage.getItem('my-acgn-journey:theme');
+    return theme === 'dark' ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+}
+
+function getInitialMotion() {
+  try {
+    const preference = localStorage.getItem(MOTION_KEY);
+    if (preference !== null) return preference !== 'off';
+  } catch {
+    /* The current session can still apply the preference. */
+  }
+  return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
+function downloadBackup(records, format = 'json') {
+  const blob = new Blob([createExportText(records, format)], {
+    type: getExportMimeType(format),
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = getExportFileName(format);
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('search');
+  const library = useLibrary();
+  const { records, storage, canWrite, recovery, resolveRecovery, retrySave } =
+    library;
+  const backgroundState = useBackground();
+  const { background } = backgroundState;
+  const [activeTab, setActiveTab] = useState('overview');
+  const [discoverMode, setDiscoverMode] = useState('text');
+  const [libraryFilters, setLibraryFilters] = useState(null);
+  const [statsFilters, setStatsFilters] = useState(null);
+  const [showStats, setShowStats] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsView, setSettingsView] = useState('preferences');
   const [theme, setTheme] = useState(getInitialTheme);
-  const [themeStorageMode, setThemeStorageMode] = useState('checking');
+  const [themeMode, setThemeMode] = useState('checking');
+  const [themeCacheError, setThemeCacheError] = useState('');
+  const [themeSaveError, setThemeSaveError] = useState('');
+  const [motionEnabled, setMotionEnabled] = useState(getInitialMotion);
   const [toast, setToast] = useState('');
-  const [showCover, setShowCover] = useState(true);
-  const [coverLeaving, setCoverLeaving] = useState(false);
-  const [exportFormat, setExportFormat] = useState('json');
-  const [pendingBackupImport, setPendingBackupImport] = useState(null);
-  const fileInputRef = useRef(null);
-  const bgInputRef = useRef(null);
-  const {
-    records,
-    addWork,
-    updateRecord,
-    deleteRecord,
-    bulkUpdateRecords,
-    deleteRecords,
-    replaceRecords,
-    mergeRecords,
-    hasWork,
-    storage,
-  } = useLibrary();
-  const { background, setImage, setOpacity, setBlur, clearImage } = useBackground();
+  const [pendingBackup, setPendingBackup] = useState(null);
+  const [recoveryDismissed, setRecoveryDismissed] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [pendingRecovery, setPendingRecovery] = useState(null);
+  const toastTimer = useRef(null);
+  const themeSaveQueue = useRef(Promise.resolve());
+  const currentTheme = useRef(theme);
+  currentTheme.current = theme;
   const stats = useMemo(() => getStats(records), [records]);
-  const isDark = theme === 'dark';
+  const detailedRecords = useMemo(
+    () => filterRecords(records, statsFilters || {}),
+    [records, statsFilters]
+  );
+  const detailedStats = useMemo(
+    () => getStats(detailedRecords),
+    [detailedRecords]
+  );
+
+  const notify = useCallback((message) => {
+    setToast(message);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(''), 3200);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+  useEffect(() => {
+    setRecoveryDismissed(false);
+  }, [recovery]);
 
   useEffect(() => {
     let cancelled = false;
     loadLocalSetting('theme')
       .then((setting) => {
         if (cancelled) return;
-        if (setting?.value === 'dark' || setting?.value === 'light') {
+        if (setting?.value === 'light' || setting?.value === 'dark')
           setTheme(setting.value);
-        }
-        setThemeStorageMode('local');
+        setThemeMode('local');
       })
       .catch(() => {
-        if (!cancelled) setThemeStorageMode('browser');
+        if (!cancelled) setThemeMode('browser');
       });
     return () => {
       cancelled = true;
@@ -113,170 +161,119 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    localStorage.setItem(THEME_KEY, theme);
-    if (themeStorageMode === 'local') {
-      saveLocalSetting('theme', theme).catch(() => {
-        setThemeStorageMode('browser');
-      });
+    if (themeMode === 'checking') return;
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+      setThemeCacheError('');
+    } catch {
+      setThemeCacheError('主题已应用，浏览器偏好暂时无法保存。');
     }
-  }, [theme, themeStorageMode]);
+    if (themeMode === 'local') {
+      themeSaveQueue.current = themeSaveQueue.current
+        .catch(() => {})
+        .then(() => saveLocalSetting('theme', theme))
+        .then(() => {
+          if (currentTheme.current === theme) setThemeSaveError('');
+        })
+        .catch(() => {
+          if (currentTheme.current === theme)
+            setThemeSaveError('主题已应用，本机偏好保存失败。');
+        });
+    }
+  }, [theme, themeMode]);
 
-  const handleEnterApp = () => {
-    if (coverLeaving) return;
-    setCoverLeaving(true);
-    window.setTimeout(() => setShowCover(false), 560);
-  };
+  useEffect(() => {
+    document.documentElement.dataset.motion = motionEnabled ? 'on' : 'off';
+    try {
+      localStorage.setItem(MOTION_KEY, motionEnabled ? 'on' : 'off');
+    } catch {
+      /* Motion remains available for this session. */
+    }
+  }, [motionEnabled]);
 
-  const handleCoverKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      handleEnterApp();
+  const runMutation = (operation) => {
+    try {
+      return operation();
+    } catch (error) {
+      notify(
+        error.code === 'LIBRARY_NOT_READY'
+          ? '作品库正在连接或等待恢复选择，请稍后再试。'
+          : error.message || '操作未完成'
+      );
+      return false;
     }
   };
 
-  const showToast = (message) => {
-    setToast(message);
-    window.clearTimeout(showToast.timer);
-    showToast.timer = window.setTimeout(() => setToast(''), 2800);
+  const openLibrary = (filters = {}) => {
+    setLibraryFilters({ ...filters });
+    setActiveTab('library');
+    setShowStats(false);
   };
-
-  const handleToggleTheme = () => {
-    setTheme((current) => {
-      const next = current === 'dark' ? 'light' : 'dark';
-      showToast(next === 'dark' ? '已切换到暗夜主题' : '已切换到日间主题');
-      return next;
-    });
+  const openImport = () => {
+    setSettingsView('import');
+    setSettingsOpen(true);
   };
-
-  const handleAddWork = (work) => {
-    const record = addWork(work);
-    showToast(`已加入我的库，并标记为${getDoneLabel(record.type)}`);
+  const editRecord = (record) => {
+    if (!canWrite) {
+      notify('请先完成作品库连接或副本恢复。');
+      return;
+    }
+    setEditingRecord(record);
+  };
+  const addWork = (work) => {
+    const record = runMutation(() => library.addWork(work));
+    if (record) notify(`已加入作品库，标记为${getDoneLabel(record.type)}`);
     return record;
   };
-
-  const handleSaveRecord = (draft) => {
-    updateRecord(draft.id, draft);
-    setEditingRecord(null);
-    showToast('记录已更新');
+  const mergeRecords = (nextRecords) => {
+    const result = runMutation(() => library.mergeRecords(nextRecords));
+    if (result === false) return false;
+    notify(`已合并 ${nextRecords.length} 条记录`);
+    return true;
   };
-
-  const handleDeleteRecord = (id) => {
-    deleteRecord(id);
-    showToast('记录已删除');
+  const replaceRecords = (nextRecords) => {
+    const result = runMutation(() => library.replaceRecords(nextRecords));
+    if (result === false) return false;
+    notify(`已恢复 ${nextRecords.length} 条记录`);
+    return true;
   };
-
-  const handleBulkUpdateRecords = (ids, patch) => {
-    bulkUpdateRecords(ids, patch);
-    showToast(`已更新 ${ids.length} 条记录`);
-  };
-
-  const handleDeleteRecords = (ids) => {
-    deleteRecords(ids);
-    showToast(`已删除 ${ids.length} 条记录`);
-  };
-
-  const handleMergeImport = (nextRecords) => {
-    mergeRecords(nextRecords);
-    showToast(`已合并导入 ${nextRecords.length} 条记录`);
-  };
-
-  const handleReplaceImport = (nextRecords) => {
-    replaceRecords(nextRecords);
-    showToast(`已覆盖导入 ${nextRecords.length} 条记录`);
-  };
-
-  const handleExportBackup = () => {
-    const blob = new Blob([createExportText(records, exportFormat)], {
-      type: getExportMimeType(exportFormat),
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getExportFileName(exportFormat);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    showToast(`已导出 ${records.length} 条 ${exportFormat.toUpperCase()} 备份`);
-  };
-
-  const handleImportBackup = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
+  const importBackup = async (file) => {
     try {
-      const payload = JSON.parse(await file.text());
-      const importedRecords = readBackup(payload);
-      setPendingBackupImport({
-        records: importedRecords,
-        fileName: file.name,
+      setPendingBackup({
+        records: readBackup(JSON.parse(await file.text())),
+        name: file.name,
       });
     } catch (error) {
-      showToast(error.message || '备份导入失败');
+      notify(error.message || '备份读取失败');
     }
   };
-
-  const handleConfirmBackupImport = () => {
-    if (!pendingBackupImport) return;
-    replaceRecords(pendingBackupImport.records);
-    showToast(`已恢复 ${pendingBackupImport.records.length} 条备份记录`);
-    setPendingBackupImport(null);
-  };
-
-  const handleImportBackground = async (event) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-
+  const handleRecovery = async (source, id) => {
+    setRecoveryBusy(true);
     try {
-      const dataUrl = await readImageFile(file);
-      setImage(dataUrl);
-      showToast('已应用自定义背景');
+      await resolveRecovery(source, id);
+      setPendingRecovery(null);
     } catch (error) {
-      showToast(error.message || '背景图片导入失败');
+      notify(error.message || '副本恢复失败，请重试或先导出副本。');
+    } finally {
+      setRecoveryBusy(false);
     }
   };
 
-  const handleClearBackground = () => {
-    clearImage();
-    showToast('已恢复默认背景');
-  };
+  const saveStatus =
+    storage.status || (storage.mode === 'checking' ? 'checking' : 'saved');
+  const statusText =
+    {
+      checking: '正在连接',
+      saving: '正在保存',
+      saved: storage.mode === 'local' ? '本机已保存' : '浏览器已保存',
+      pending: '等待同步',
+      conflict: '版本冲突',
+      error: '保存失败',
+    }[saveStatus] || '检查保存状态';
+  const hasStorageNotice = storage.error || storage.cacheError || recovery;
 
   return (
-    <div className={showCover ? 'app-shell app-shell-with-cover' : 'app-shell'}>
-      {showCover && (
-        <section
-          className={coverLeaving ? 'cover-screen leaving' : 'cover-screen'}
-          aria-labelledby="cover-title"
-          role="button"
-          tabIndex={0}
-          onClick={handleEnterApp}
-          onKeyDown={handleCoverKeyDown}
-        >
-          <div className="cover-atmosphere" aria-hidden="true" />
-          <div className="cover-mosaic" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="cover-content">
-            <p className="cover-kicker">acgn_journey</p>
-            <h1 id="cover-title">由此开启你的ACGN之旅</h1>
-            <p className="cover-lead">
-              让作品、进度、收藏和回忆落在自己的设备里。轻点任意一处，进入你的私人档案。
-            </p>
-          </div>
-        </section>
-      )}
-
-      <div
-        className={showCover && !coverLeaving ? 'main-stage behind-cover' : 'main-stage ready'}
-        aria-hidden={showCover && !coverLeaving}
-      >
+    <div className="app-shell">
       {background.image && (
         <div
           className="app-background"
@@ -284,296 +281,313 @@ export default function App() {
           style={{
             backgroundImage: `url(${background.image})`,
             opacity: background.opacity,
-            filter: background.blur ? `blur(${background.blur}px)` : 'none',
+            filter: `blur(${background.blur}px)`,
           }}
         />
       )}
-      <header className="topbar">
-        <div className="brand">
-          <div>
-            <h1>acgn_journey</h1>
-            <p>{records.length} 部作品已记录</p>
-          </div>
-        </div>
-
-        <nav className="tabbar" aria-label="主导航">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                className={activeTab === tab.id ? 'tab active' : 'tab'}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <Icon size={17} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="topbar-meta" aria-label="快速概览">
-          <span>{stats.doneCount} 已完成</span>
-          <span>{stats.averageRating || '--'} 均分</span>
-        </div>
-      </header>
-
-      <main className="workspace">
-        <div key={activeTab} className="view-transition">
-        {activeTab === 'search' && (
-          <SearchPanel hasWork={hasWork} onAddWork={handleAddWork} />
-        )}
-
-        {activeTab === 'trace' && (
-          <TraceMoePanel hasWork={hasWork} onAddWork={handleAddWork} />
-        )}
-
-        {activeTab === 'library' && (
-          <LibraryPanel
-            records={records}
-            onEditRecord={setEditingRecord}
-            onDeleteRecord={handleDeleteRecord}
-            onBulkUpdateRecords={handleBulkUpdateRecords}
-            onDeleteRecords={handleDeleteRecords}
-          />
-        )}
-
-        {activeTab === 'inventory' && (
-          <InventoryPanel
-            records={records}
-            onEditRecord={setEditingRecord}
-            onUpdateRecord={updateRecord}
-          />
-        )}
-
-        {activeTab === 'import' && (
-          <BulkImportPanel
-            onMergeRecords={handleMergeImport}
-            onReplaceRecords={handleReplaceImport}
-          />
-        )}
-
-        {activeTab === 'timeline' && (
-          <TimelinePanel records={records} onEditRecord={setEditingRecord} />
-        )}
-
-        {activeTab === 'stats' && <StatsPanel records={records} stats={stats} />}
-
-        {activeTab === 'ai-profile' && (
-          <AiProfilePanel
-            records={records}
-            stats={stats}
-            storage={storage}
-            onToast={showToast}
-          />
-        )}
-        </div>
-      </main>
-
-      <footer className="site-footer">
-        <a
-          className="repo-link"
-          href="https://github.com/ChibaRie/acgn_journey"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Github size={18} aria-hidden="true" />
-          <span>ChibaRie/acgn_journey</span>
-          <ExternalLink size={15} aria-hidden="true" />
-        </a>
-      </footer>
-
-      {settingsOpen && (
-        <aside className="settings-popover" role="dialog" aria-labelledby="settings-title">
-          <div className="settings-header">
-            <div>
-              <p className="eyebrow">设置说明</p>
-              <h2 id="settings-title">数据与偏好</h2>
-            </div>
+      <header className="app-header">
+        <div className="header-inner">
+          <nav className="main-nav" aria-label="主导航">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={
+                    activeTab === tab.id ? 'nav-button active' : 'nav-button'
+                  }
+                  aria-label={tab.label}
+                  aria-current={activeTab === tab.id ? 'page' : undefined}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    if (tab.id === 'overview') setShowStats(false);
+                  }}
+                >
+                  <Icon size={19} aria-hidden="true" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="header-actions">
             <button
               className="icon-button"
               type="button"
-              onClick={() => setSettingsOpen(false)}
-              aria-label="关闭设置说明"
-              title="关闭"
+              aria-label={theme === 'dark' ? '切换日间主题' : '切换暗夜主题'}
+              title={theme === 'dark' ? '切换日间主题' : '切换暗夜主题'}
+              disabled={themeMode === 'checking'}
+              onClick={() =>
+                setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+              }
             >
-              <X size={17} />
-            </button>
-          </div>
-          <dl className="settings-list">
-            <div>
-              <dt>记录数据</dt>
-              <dd>
-                {storage.mode === 'local'
-                  ? `保存在本机 SQLite 数据库：${storage.path || '本地数据目录'}，不会随浏览器清理丢失。`
-                  : '当前回退到浏览器 LocalStorage；若本机数据服务可用会优先写入 SQLite。'}
-              </dd>
-            </div>
-            <div>
-              <dt>主题偏好</dt>
-              <dd>日间/暗夜选择会保存在本机浏览器，下次打开自动沿用。</dd>
-            </div>
-            <div>
-              <dt>搜索来源</dt>
-              <dd>当前为墙内优先的单来源检索：AGE动漫、萌娘百科为直连，Bangumi 标注为需代理。</dd>
-            </div>
-            <div>
-              <dt>存储模式</dt>
-              <dd>
-                {storage.mode === 'local'
-                  ? `本机持久化已启用（${storage.type}）`
-                  : `本机持久化未连接，${storage.error || '使用浏览器回退存储'}`}
-              </dd>
-            </div>
-          </dl>
-
-          <div className="settings-section">
-            <div className="settings-section-head">
-              <p className="settings-section-title">自定义背景</p>
-              <span className="settings-section-hint">图片仅保存在本机浏览器</span>
-            </div>
-            <div className="settings-actions">
-              <button
-                className="button primary"
-                type="button"
-                onClick={() => bgInputRef.current?.click()}
-              >
-                <ImageIcon size={16} />
-                <span>导入图片</span>
-              </button>
-              <button
-                className="button secondary"
-                type="button"
-                onClick={handleClearBackground}
-                disabled={!background.image}
-              >
-                <X size={16} />
-                <span>恢复默认</span>
-              </button>
-              <input
-                ref={bgInputRef}
-                className="sr-only"
-                type="file"
-                accept="image/*"
-                onChange={handleImportBackground}
-              />
-            </div>
-            <label className="settings-slider">
-              <span>
-                不透明度<em>{Math.round(background.opacity * 100)}%</em>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.05"
-                value={background.opacity}
-                disabled={!background.image}
-                onChange={(event) => setOpacity(Number(event.target.value))}
-              />
-            </label>
-            <label className="settings-slider">
-              <span>
-                模糊<em>{background.blur}px</em>
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                step="1"
-                value={background.blur}
-                disabled={!background.image}
-                onChange={(event) => setBlur(Number(event.target.value))}
-              />
-            </label>
-          </div>
-
-          <div className="settings-section">
-            <div className="settings-section-head">
-              <p className="settings-section-title">导出格式</p>
-              <span className="settings-section-hint">JSON 可直接恢复</span>
-            </div>
-            <label className="settings-select">
-              <span>备份文件格式</span>
-              <select value={exportFormat} onChange={(event) => setExportFormat(event.target.value)}>
-                {EXPORT_FORMATS.map((format) => (
-                  <option key={format.value} value={format.value}>
-                    {format.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="settings-actions">
-            <button className="button primary" type="button" onClick={handleExportBackup}>
-              <Download size={16} />
-              <span>导出 {exportFormat.toUpperCase()}</span>
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
             <button
-              className="button secondary"
+              className="icon-button"
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              aria-label="数据与设置"
+              title="数据与设置"
+              onClick={() => {
+                setSettingsView('preferences');
+                setSettingsOpen(true);
+              }}
             >
-              <Upload size={16} />
-              <span>导入备份</span>
+              <Settings2 size={20} />
             </button>
-            <input
-              ref={fileInputRef}
-              className="sr-only"
-              type="file"
-              accept="application/json,.json"
-              onChange={handleImportBackup}
-            />
           </div>
-        </aside>
-      )}
+        </div>
+      </header>
 
-      <div className="floating-toolbar" aria-label="右下角功能栏">
-        <button
-          className="floating-tool-button"
-          type="button"
-          onClick={handleToggleTheme}
-          aria-label={isDark ? '切换日间主题' : '切换暗夜主题'}
-          title={isDark ? '切换日间主题' : '切换暗夜主题'}
+      <main className="workspace" tabIndex={-1} data-focus-fallback>
+        <div
+          className={`storage-strip status-${saveStatus}`}
+          role="status"
+          aria-live="polite"
         >
-          {isDark ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-        <button
-          className={settingsOpen ? 'floating-tool-button active' : 'floating-tool-button'}
-          type="button"
-          onClick={() => setSettingsOpen((current) => !current)}
-          aria-label="打开数据与偏好说明"
-          title="数据与偏好说明"
+          <span>
+            {saveStatus === 'checking' || saveStatus === 'saving' ? (
+              <Loader2 size={16} className="spin" />
+            ) : (
+              <CheckCircle2 size={16} />
+            )}{' '}
+            {statusText}
+          </span>
+          {hasStorageNotice && (
+            <button
+              className="text-button"
+              type="button"
+              onClick={() => {
+                if (recovery) setRecoveryDismissed(false);
+                else {
+                  setSettingsView('preferences');
+                  setSettingsOpen(true);
+                }
+              }}
+            >
+              查看详情
+            </button>
+          )}
+          {['pending', 'error'].includes(saveStatus) && (
+            <button
+              className="text-button"
+              type="button"
+              onClick={() =>
+                Promise.resolve(retrySave()).catch((error) =>
+                  notify(error.message || '重试保存失败')
+                )
+              }
+            >
+              重试保存
+            </button>
+          )}
+        </div>
+        <Suspense
+          fallback={
+            <div className="loading-state" role="status">
+              <Loader2 className="spin" size={22} />
+              正在加载页面…
+            </div>
+          }
         >
-          <Settings2 size={18} />
-        </button>
-      </div>
+          <div key={activeTab} className="view-transition">
+            {activeTab === 'overview' && !showStats && (
+              <Dashboard
+                records={records}
+                onEditRecord={editRecord}
+                onOpenLibrary={openLibrary}
+                onOpenDiscover={() => setActiveTab('discover')}
+                onOpenImport={openImport}
+                onOpenStats={(filters) => {
+                  setStatsFilters(filters);
+                  setShowStats(true);
+                }}
+                onToast={notify}
+                motionEnabled={motionEnabled}
+              />
+            )}
+            {activeTab === 'overview' && showStats && (
+              <>
+                <div className="page-heading">
+                  <h1>详细统计</h1>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => setShowStats(false)}
+                  >
+                    <ArrowLeft size={18} />
+                    返回总览
+                  </button>
+                </div>
+                <StatsPanel records={detailedRecords} stats={detailedStats} />
+              </>
+            )}
+            {activeTab === 'library' && (
+              <LibraryPanel
+                records={records}
+                externalFilters={libraryFilters}
+                readOnly={!canWrite}
+                onEditRecord={editRecord}
+                onDeleteRecord={(id) => {
+                  if (runMutation(() => library.deleteRecord(id)) !== false)
+                    notify('记录已删除');
+                }}
+                onBulkUpdateRecords={(ids, patch) => {
+                  if (
+                    runMutation(() => library.bulkUpdateRecords(ids, patch)) !==
+                    false
+                  )
+                    notify(`已更新 ${ids.length} 条记录`);
+                }}
+                onDeleteRecords={(ids) => {
+                  if (runMutation(() => library.deleteRecords(ids)) !== false)
+                    notify(`已删除 ${ids.length} 条记录`);
+                }}
+              />
+            )}
+            {activeTab === 'discover' && (
+              <div className="discover-page">
+                <div className="page-heading">
+                  <h1>发现作品</h1>
+                  <div
+                    className="segmented-control"
+                    role="group"
+                    aria-label="发现方式"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={discoverMode === 'text'}
+                      onClick={() => setDiscoverMode('text')}
+                    >
+                      文字搜索
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={discoverMode === 'image'}
+                      onClick={() => setDiscoverMode('image')}
+                    >
+                      截图识别
+                    </button>
+                  </div>
+                </div>
+                {discoverMode === 'text' ? (
+                  <SearchPanel
+                    hasWork={library.hasWork}
+                    onAddWork={addWork}
+                    readOnly={!canWrite}
+                  />
+                ) : (
+                  <TraceMoePanel
+                    hasWork={library.hasWork}
+                    onAddWork={addWork}
+                    readOnly={!canWrite}
+                  />
+                )}
+              </div>
+            )}
+            {activeTab === 'timeline' && (
+              <TimelinePanel
+                records={records}
+                onEditRecord={editRecord}
+                readOnly={!canWrite}
+              />
+            )}
+            {activeTab === 'inventory' && (
+              <InventoryPanel
+                records={records}
+                onEditRecord={editRecord}
+                readOnly={!canWrite}
+                onUpdateRecord={(id, patch) =>
+                  runMutation(() => library.updateRecord(id, patch))
+                }
+              />
+            )}
+            {activeTab === 'ai-profile' && (
+              <AiProfilePanel
+                records={records}
+                stats={stats}
+                storage={storage}
+                onToast={notify}
+              />
+            )}
+          </div>
+          {settingsOpen && (
+            <SettingsDialog
+              records={records}
+              storage={storage}
+              backgroundState={backgroundState}
+              preferenceError={themeCacheError || themeSaveError}
+              canWrite={canWrite}
+              initialView={settingsView}
+              motionEnabled={motionEnabled}
+              onMotionChange={setMotionEnabled}
+              onClose={() => setSettingsOpen(false)}
+              onToast={notify}
+              onExport={(format) => downloadBackup(records, format)}
+              onImportBackup={importBackup}
+              onMergeRecords={mergeRecords}
+              onReplaceRecords={replaceRecords}
+            />
+          )}
+          {editingRecord && (
+            <RecordEditor
+              record={editingRecord}
+              onClose={() => setEditingRecord(null)}
+              onSave={(draft) => {
+                if (
+                  runMutation(() => library.updateRecord(draft.id, draft)) !==
+                  false
+                ) {
+                  setEditingRecord(null);
+                  notify('记录已更新');
+                }
+              }}
+            />
+          )}
+        </Suspense>
+      </main>
 
-      {editingRecord && (
-        <RecordEditor
-          record={editingRecord}
-          onClose={() => setEditingRecord(null)}
-          onSave={handleSaveRecord}
-        />
-      )}
-
-      {pendingBackupImport && (
-        <ConfirmModal
-          eyebrow="备份导入"
-          title="覆盖当前作品库？"
-          description={`将用 ${pendingBackupImport.fileName} 中的 ${pendingBackupImport.records.length} 条记录覆盖当前作品库。建议先导出当前备份再继续。`}
-          icon={Upload}
-          confirmLabel="确认覆盖"
-          onCancel={() => setPendingBackupImport(null)}
-          onConfirm={handleConfirmBackupImport}
-        />
-      )}
-
-      <div className={toast ? 'toast show' : 'toast'} role="status" aria-live="polite">
+      <Suspense fallback={null}>
+        {recovery && !recoveryDismissed && (
+          <RecoveryDialog
+            recovery={recovery}
+            busy={recoveryBusy}
+            onClose={() => setRecoveryDismissed(true)}
+            onUseBaseline={() => handleRecovery('baseline')}
+            onUseCandidate={setPendingRecovery}
+            onExport={downloadBackup}
+          />
+        )}
+        {pendingRecovery && (
+          <ConfirmModal
+            title="使用浏览器副本替换当前库？"
+            description={`将采用此副本中的 ${pendingRecovery.records.length} 条记录。请确认需要保留的其他副本已经导出。`}
+            confirmLabel="确认使用此副本"
+            onCancel={() => setPendingRecovery(null)}
+            onConfirm={() => {
+              if (!recoveryBusy)
+                handleRecovery('candidate', pendingRecovery.id);
+            }}
+          />
+        )}
+        {pendingBackup && (
+          <ConfirmModal
+            title="覆盖当前作品库？"
+            description={`将使用 ${pendingBackup.name} 中的 ${pendingBackup.records.length} 条记录。建议先导出当前备份。`}
+            confirmLabel="确认覆盖"
+            onCancel={() => setPendingBackup(null)}
+            onConfirm={() => {
+              if (replaceRecords(pendingBackup.records)) setPendingBackup(null);
+            }}
+          />
+        )}
+      </Suspense>
+      <div
+        className={toast ? 'toast show' : 'toast'}
+        role="status"
+        aria-live="polite"
+      >
         {toast}
-      </div>
       </div>
     </div>
   );

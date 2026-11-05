@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/version-v0.8-ff646d?style=flat-square" alt="当前版本 v0.8">
+    <img src="https://img.shields.io/badge/version-v0.9--dev-ff646d?style=flat-square" alt="当前开发版本 v0.9">
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f81f7?style=flat-square" alt="MIT License"></a>
     <img src="https://img.shields.io/badge/desktop-Electron_38-47848f?style=flat-square" alt="Electron 38">
     <a href="https://github.com/ChibaRie/acgn_journey/actions/workflows/deploy.yml"><img src="https://github.com/ChibaRie/acgn_journey/actions/workflows/deploy.yml/badge.svg" alt="部署状态"></a>
@@ -27,6 +27,8 @@
 
 > [!IMPORTANT]
 > GitHub Pages 是静态演示版，数据会回退到浏览器 LocalStorage。长期使用建议运行桌面版，让作品库、设置和 LLM 配置保存在自己的设备上。
+
+> V0.9 开发中。本轮规划为二次元统计首页、前端重设计、持久化与交互修复，审计结果见 [V0.9 现状审计](docs/reviews/2026-11-05-v0.9-audit.md)。
 
 ---
 
@@ -139,7 +141,7 @@ python scripts/tag_wordcloud.py path\to\backup.json -o tag-wordcloud.html
 
 ## 更新记录
 
-### v0.8（当前）
+### v0.8
 
 - **AI 用户画像实验**：新增桌面优先的 AI 画像入口，默认只发送聚合统计和少量代表作品，不发送完整库、短评或简介。
 - **LLM 配置增强**：支持 OpenAI-compatible 模型列表获取、连通性测试、一键清除配置，默认温度为 `0.8`，Prompt 预览默认折叠。

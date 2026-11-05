@@ -1,6 +1,6 @@
 import { matchRoute, rewritePath, corsHeaders } from './router.js';
 
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.9.0';
 
 export default {
   async fetch(request, env) {

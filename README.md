@@ -30,6 +30,7 @@
 
 > V0.9 开发中。本轮规划为二次元统计首页、前端重设计、持久化与交互修复，审计结果见 [V0.9 现状审计](docs/reviews/2026-11-05-v0.9-audit.md)。
 > [V0.9 交互草图](docs/prototypes/v0.9-dashboard-directions.html) 提供两种布局供视觉比较，可在浏览器中直接打开 HTML 文件。
+> 已选定 B 晴空收藏室，完整范围与验收标准见 [V0.9 设计稿](docs/superpowers/specs/2026-11-05-v0.9-bright-dashboard-design.md)。
 
 ---
 

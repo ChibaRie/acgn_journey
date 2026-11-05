@@ -10,7 +10,7 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/version-v0.9--dev-ff646d?style=flat-square" alt="当前开发版本 v0.9">
+    <img src="https://img.shields.io/badge/version-v0.9.0-4165b0?style=flat-square" alt="当前版本 v0.9.0">
     <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-2f81f7?style=flat-square" alt="MIT License"></a>
     <img src="https://img.shields.io/badge/desktop-Electron_38-47848f?style=flat-square" alt="Electron 38">
     <a href="https://github.com/ChibaRie/acgn_journey/actions/workflows/deploy.yml"><img src="https://github.com/ChibaRie/acgn_journey/actions/workflows/deploy.yml/badge.svg" alt="部署状态"></a>
@@ -28,9 +28,7 @@
 > [!IMPORTANT]
 > GitHub Pages 是静态演示版，数据会回退到浏览器 LocalStorage。长期使用建议运行桌面版，让作品库、设置和 LLM 配置保存在自己的设备上。
 
-> V0.9 开发中。本轮规划为二次元统计首页、前端重设计、持久化与交互修复，审计结果见 [V0.9 现状审计](docs/reviews/2026-11-05-v0.9-audit.md)。
-> [V0.9 交互草图](docs/prototypes/v0.9-dashboard-directions.html) 提供两种布局供视觉比较，可在浏览器中直接打开 HTML 文件。
-> 已选定 B 晴空收藏室，完整范围与验收标准见 [V0.9 设计稿](docs/superpowers/specs/2026-11-05-v0.9-bright-dashboard-design.md)。
+> V0.9 已实现晴空收藏室界面、统计首页、年度回顾、待补抽签与保存恢复机制。设计、计划和验证文档保存在本地 `docs/`，该目录由 Git 忽略。
 
 ---
 
@@ -89,7 +87,7 @@ npm run app
 ```text
 acgn_journey/
   .github/workflows/  # GitHub Pages 自动部署
-  docs/              # 架构、运行指南与进度记录
+  docs/              # 本地架构、计划与验证记录，Git 忽略
   electron/          # Electron 窗口入口
   public/            # 静态资源，构建时复制到 dist
   scripts/           # 桌面、开发服务启动器与离线工具
@@ -112,20 +110,23 @@ acgn_journey/
 | 样式 | 原生 CSS + CSS Variables | `data-theme` 切换暗夜/日间主题 |
 | 状态与持久化 | `useLibrary` Hook + 本机 SQLite / 浏览器回退 | 本机优先写盘，在线演示可降级 |
 | 本地数据服务 | Node 24 + `node:sqlite` | 数据写入用户目录下的 SQLite 文件 |
-| 单元测试 | Vitest | 覆盖搜索归一化与代理路由逻辑 |
+| 自动化测试 | Vitest + React Testing Library | 覆盖统计、真实 Hook 生命周期、并发保存、导入与启动器 |
 | 数据源 | AGE动漫、萌娘百科、MangaBaka、Bangumi；trace.moe | 作品文字检索 + 截图识别 |
 | 在线部署 | GitHub Pages + GitHub Actions | 保留演示入口 |
 
 ## 已实现功能
 
+- 作品总览：首页展示作品数量、完成度、个人均分、进行中封面、媒介分布、完成趋势、26 周完成日历和标签偏好，图表可联动作品库筛选。
+- 年度回顾与待补抽签：按真实完成日期回顾年度记录，从当前媒介的待看、待读、待玩作品中抽取下一部。
+- 晴空收藏室界面：明亮顶部导航、封面优先，提供暗色主题、动效开关、低动态偏好和全屏统计展示。
 - 单来源作品搜索：AGE动漫（直连）、萌娘百科（直连）、MangaBaka（轻小说、浏览器直连）、Bangumi（需代理/可 fallback），每次检索最多展示 24 条结果。
 - trace.moe 截图识别：可上传本地截图或粘贴图片 URL，返回番名、集数、时间点、相似度，并可加入我的库。
-- 我的库管理：支持列表/方块视图切换并记住上次选择；可编辑标题、类型、作品年份、状态、日期、评分、短评、标签，也支持批量选择筛选结果、批量修改状态和批量删除。
+- 我的库管理：支持列表/方块视图切换并记住上次选择，每页 48 条；可编辑标题、类型、作品年份、状态、日期、评分、短评、标签，批量选择和操作覆盖当前完整筛选结果。
 - 我的库分类：支持按 Galgame、轻小说、动漫、漫画、其他和作品年份筛选。
 - 个人历程：按年份分组展示，支持年份、类型、状态筛选。
 - 统计面板：总作品数、已完成数、平均评分、标签词云、类型/作品年份/记录年份/状态/评分分布。
 - AI 用户画像实验：桌面模式可配置 OpenAI-compatible LLM，支持获取模型列表、测试连通性和清除配置，用本地聚合摘要生成结构化偏好画像；在线演示仅提供 Prompt 预览与复制。
-- 数据持久化：桌面/本地模式优先写入本机 SQLite，浏览器回退 key 为 `acgn_journey:records:v1`。
+- 数据持久化：本机 SQLite 采用 revision 校验与串行保存，浏览器按窗口保留版本化副本，兼容 `acgn_journey:records:v1` 历史数据。空库迁移或版本冲突时可选择、导出和恢复副本。
 - 数据导出与备份：设置面板支持按 JSON、XML 或 CSV 导出备份；JSON 备份可直接导入覆盖恢复。
 - 自定义背景：支持导入本地图片作为全局背景，可调节不透明度与模糊度；优先写入本机 SQLite。
 - 实体库存管理：记录实体藏品的购买价格、渠道、摆放位置、限定版、开封状态、购买日期和备注。
@@ -142,6 +143,14 @@ python scripts/tag_wordcloud.py path\to\backup.json -o tag-wordcloud.html
 先在设置面板导出 JSON 备份，再运行上述命令即可生成独立的交互式标签词云页面；未安装 `pyecharts` 时脚本会生成静态 HTML fallback。
 
 ## 更新记录
+
+### v0.9.0
+
+- 晴空收藏室全页面重设计，统一正文 16px、辅助文字至少 14px，提供主题、动效与原生模态键盘行为。
+- 新增真实统计总览、年度回顾、待补作品抽签与图表筛选联动，原有分布可从“详细统计”进入。
+- 修复初始化覆盖修改、并发快照覆盖、缓存配额异常、协议/鉴权复用和副本恢复竞态。
+- 修复类型分类、标签计数、导入及搜索迟到结果、AI 响应与配置初始化。
+- 页面按需加载，作品库分页，统计按页面需要计算，验证使用独立 SQLite 与合成数据。
 
 ### v0.8
 
@@ -224,9 +233,7 @@ python scripts/tag_wordcloud.py path\to\backup.json -o tag-wordcloud.html
 
 ## 文档
 
-- 架构设计：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- 部署与运行：[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-- 进度记录：[docs/PROGRESS.md](docs/PROGRESS.md)
+文档保存在本地 `docs/`，包含架构设计、运行指南、进度记录、迭代计划和验证结果。
 
 ## License
 

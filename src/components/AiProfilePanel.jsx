@@ -96,7 +96,7 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
   const promptMessages = useMemo(() => buildAiProfilePrompt(promptInput), [promptInput]);
   const promptText = useMemo(() => toPromptText(promptMessages), [promptMessages]);
   const hasProviderConfig =
-    isLocalServiceReady && isFilled(config.baseUrl) && isFilled(config.apiKey);
+    isLocalServiceReady && !configLoading && isFilled(config.baseUrl) && isFilled(config.apiKey);
   const canGenerate =
     hasRecords &&
     hasProviderConfig &&
@@ -308,8 +308,7 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
       <section className="panel ai-profile-panel" aria-labelledby="ai-profile-title">
         <div className="section-heading split">
           <div>
-            <p className="eyebrow">AI 用户画像</p>
-            <h2 id="ai-profile-title">从作品库生成偏好洞察</h2>
+            <h2 id="ai-profile-title">AI 兴趣画像</h2>
           </div>
         </div>
         <EmptyState
@@ -324,8 +323,7 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
     <section className="panel ai-profile-panel" aria-labelledby="ai-profile-title">
       <div className="section-heading split">
         <div>
-          <p className="eyebrow">AI 用户画像</p>
-          <h2 id="ai-profile-title">用本地汇总数据生成 ACGN 偏好画像</h2>
+          <h2 id="ai-profile-title">AI 兴趣画像</h2>
         </div>
         <div className="result-count">{records.length} 条记录</div>
       </div>
@@ -361,7 +359,6 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
       >
         <div className="section-heading split compact-heading">
           <div>
-            <p className="eyebrow">Prompt Preview</p>
             <h3>将发送给 AI 的内容</h3>
           </div>
           <div className="ai-profile-preview-actions">
@@ -382,16 +379,13 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
         </div>
         {promptExpanded ? (
           <pre>{promptText}</pre>
-        ) : (
-          <p className="muted-text">Prompt 默认折叠；点击展开可审阅完整发送内容。</p>
-        )}
+        ) : null}
       </section>
 
       {isLocalServiceReady ? (
         <section className="ai-profile-config" aria-label="LLM 配置">
           <div className="section-heading split compact-heading">
             <div>
-              <p className="eyebrow">LLM Config</p>
               <h3>桌面版模型配置</h3>
             </div>
             {configLoading && <span className="muted-text">读取配置中...</span>}
@@ -399,20 +393,22 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
 
           <div className="ai-profile-form">
             <label>
-              <span>Base URL</span>
+              <span>接口地址</span>
               <input
                 type="url"
                 value={config.baseUrl}
+                disabled={configLoading}
                 placeholder="https://api.openai.com/v1"
                 onChange={(event) => updateConfig('baseUrl', event.target.value)}
               />
             </label>
             <label className="ai-profile-model-field">
-              <span>Model</span>
+              <span>模型</span>
               <div className="ai-profile-field-row">
                 <input
                   list="ai-profile-model-options"
                   value={config.model}
+                  disabled={configLoading}
                   placeholder="gpt-4.1-mini"
                   onChange={(event) => updateConfig('model', event.target.value)}
                 />
@@ -445,25 +441,27 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
               <input
                 type="password"
                 value={config.apiKey}
+                disabled={configLoading}
                 placeholder="sk-..."
                 onChange={(event) => updateConfig('apiKey', event.target.value)}
               />
             </label>
             <label>
-              <span>Temperature</span>
+              <span>温度</span>
               <input
                 type="number"
                 min="0"
                 max="2"
                 step="0.1"
                 value={config.temperature}
+                disabled={configLoading}
                 onChange={(event) => updateConfig('temperature', event.target.value)}
               />
             </label>
           </div>
 
           <div className="ai-profile-actions">
-            <button className="button secondary" type="button" onClick={saveConfig}>
+            <button className="button secondary" type="button" onClick={saveConfig} disabled={configLoading}>
               <KeyRound size={16} />
               <span>保存配置</span>
             </button>
@@ -480,7 +478,7 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
               )}
               <span>{isTestingConnection ? '测试中' : '测试连通'}</span>
             </button>
-            <button className="button secondary" type="button" onClick={clearConfig}>
+            <button className="button secondary" type="button" onClick={clearConfig} disabled={configLoading}>
               <Trash2 size={16} />
               <span>清除配置</span>
             </button>
@@ -508,7 +506,6 @@ export default function AiProfilePanel({ records = [], stats = {}, storage = {},
         <section className="ai-profile-result" aria-label="AI 用户画像结果">
           <div className="section-heading compact-heading">
             <div>
-              <p className="eyebrow">Profile Result</p>
               <h3>画像结果</h3>
             </div>
           </div>

@@ -1,16 +1,37 @@
 const DEFAULT_LOCAL_API_PORT = 5198;
 const REQUEST_TIMEOUT_MS = 2500;
+const LOCAL_API_TOKEN_HEADER = 'X-Acgn-Local-Token';
+
+function getRuntimeLocalApiConfig() {
+  if (typeof window === 'undefined') return {};
+  return window.__ACGN_LOCAL_API__ && typeof window.__ACGN_LOCAL_API__ === 'object'
+    ? window.__ACGN_LOCAL_API__
+    : {};
+}
 
 function isLoopbackHost(hostname) {
   return ['127.0.0.1', 'localhost', '::1'].includes(hostname);
 }
 
 export function getLocalApiBase() {
+  const runtimeBase = getRuntimeLocalApiConfig().baseUrl;
+  if (runtimeBase) return String(runtimeBase).replace(/\/$/, '');
   const configured = import.meta.env.VITE_LOCAL_API_BASE;
   if (configured) return configured.replace(/\/$/, '');
   if (typeof window === 'undefined') return '';
   if (!isLoopbackHost(window.location.hostname)) return '';
   return `http://${window.location.hostname}:${DEFAULT_LOCAL_API_PORT}`;
+}
+
+function getLocalApiToken() {
+  const runtimeToken = getRuntimeLocalApiConfig().token;
+  if (runtimeToken) return String(runtimeToken);
+  return String(import.meta.env.VITE_LOCAL_API_TOKEN || '');
+}
+
+function getAuthHeaders() {
+  const token = getLocalApiToken().trim();
+  return token ? { [LOCAL_API_TOKEN_HEADER]: token } : {};
 }
 
 async function requestJson(path, options = {}) {
@@ -24,6 +45,7 @@ async function requestJson(path, options = {}) {
       ...options,
       headers: {
         Accept: 'application/json',
+        ...getAuthHeaders(),
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
         ...(options.headers || {}),
       },

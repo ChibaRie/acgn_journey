@@ -6,7 +6,7 @@ import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const DATA_SERVER_SCRIPT = path.join(ROOT, 'scripts', 'local-data-server.mjs');
+const DATA_SERVER_SCRIPT = path.join(ROOT, 'server', 'local-data-server.mjs');
 
 const cleanup = [];
 
@@ -48,7 +48,7 @@ async function startMockLlm(handler) {
   };
 }
 
-async function startDataServer() {
+async function startDataServer({ token = '' } = {}) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'acgn-data-test-'));
   const port = await getFreePort();
   const child = spawn(process.execPath, [DATA_SERVER_SCRIPT], {
@@ -57,6 +57,7 @@ async function startDataServer() {
       ...process.env,
       ACGN_DATA_DIR: dataDir,
       ACGN_DB_PATH: path.join(dataDir, 'test.sqlite'),
+      ACGN_LOCAL_API_TOKEN: token,
       DATA_HOST: '127.0.0.1',
       DATA_PORT: String(port),
       LLM_PROFILE_TIMEOUT_MS: '1000',
@@ -105,6 +106,22 @@ afterEach(async () => {
   while (cleanup.length) {
     await cleanup.pop()();
   }
+});
+
+test('local API token protects records when configured', async () => {
+  const dataServer = await startDataServer({ token: 'local-test-token' });
+
+  const rejected = await fetch(`${dataServer}/api/local/records`);
+  const rejectedPayload = await rejected.json();
+  expect(rejected.status).toBe(401);
+  expect(rejectedPayload.error).toMatch(/token/);
+
+  const accepted = await fetch(`${dataServer}/api/local/records`, {
+    headers: { 'X-Acgn-Local-Token': 'local-test-token' },
+  });
+  const acceptedPayload = await accepted.json();
+  expect(accepted.status).toBe(200);
+  expect(acceptedPayload.records).toEqual([]);
 });
 
 test('POST /api/local/ai/profile returns raw LLM text without exposing apiKey', async () => {

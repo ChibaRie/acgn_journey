@@ -80,6 +80,23 @@ npm run app
 
 在线版是静态站，不能替用户启动本机软件进程。它会在无法连接本机 SQLite 服务时回退到浏览器 LocalStorage，因此清理浏览器数据可能导致在线版记录丢失。正式使用请运行桌面模式。
 
+## 目录结构
+
+```text
+acgn_journey/
+  .github/workflows/  # GitHub Pages 自动部署
+  docs/              # 架构、运行指南与进度记录
+  electron/          # Electron 窗口入口
+  public/            # 静态资源，构建时复制到 dist
+  scripts/           # 桌面、开发服务启动器与离线工具
+  server/            # 本机 SQLite / LLM 数据服务及测试
+  src/               # React 前端，测试与对应模块放在一起
+  worker/            # 可选 Cloudflare 搜索代理及测试
+  .runtime/          # 本机日志和 PID 文件，Git 忽略
+```
+
+`dist/` 为构建产物，`node_modules/` 为安装依赖。运行时鉴权令牌保存在根目录的 `.local-api-token.local`，由 Git 忽略。
+
 ## 技术栈
 
 | 层面 | 技术 | 说明 |
@@ -167,7 +184,7 @@ python scripts/tag_wordcloud.py path\to\backup.json -o tag-wordcloud.html
 
 ### v0.6.0
 
-- 新增 `scripts/local-data-server.mjs` 与 `node:sqlite` 本地数据服务。
+- 新增本机数据服务（现位于 `server/local-data-server.mjs`），使用 `node:sqlite`。
 - `npm run app` 可同时启动本机数据服务与 Vite 前端。
 
 ### v0.5.4

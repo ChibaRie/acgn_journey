@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -8,13 +9,17 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, '..');
+const RUNTIME_DIR = path.join(ROOT, '.runtime');
+fs.mkdirSync(RUNTIME_DIR, { recursive: true });
 const APP_HOST = process.env.APP_HOST || '127.0.0.1';
 const APP_PORT = Number(process.env.APP_PORT || 5188);
 const DATA_HOST = process.env.DATA_HOST || '127.0.0.1';
 const DATA_PORT = Number(process.env.DATA_PORT || 5198);
 const APP_URL = `http://${APP_HOST}:${APP_PORT}`;
 const DATA_URL = `http://${DATA_HOST}:${DATA_PORT}`;
-const LOG_FILE = path.join(ROOT, 'desktop-launch.log');
+const TOKEN_FILE = path.join(ROOT, '.local-api-token.local');
+const LOCAL_API_TOKEN = process.env.ACGN_LOCAL_API_TOKEN || readOrCreateLocalApiToken();
+const LOG_FILE = path.join(RUNTIME_DIR, 'desktop-launch.log');
 const DIST_DIR = path.join(ROOT, 'dist');
 const DIST_INDEX = path.join(DIST_DIR, 'index.html');
 const IS_WINDOWS = process.platform === 'win32';
@@ -37,6 +42,18 @@ const managedChildren = new Set();
 let electronProcess = null;
 let appServer = null;
 let isCleaningUp = false;
+
+function readOrCreateLocalApiToken() {
+  try {
+    const saved = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+    if (saved) return saved;
+  } catch {
+    // No token has been created for this project yet.
+  }
+  const token = randomBytes(24).toString('hex');
+  fs.writeFileSync(TOKEN_FILE, `${token}${os.EOL}`, { mode: 0o600 });
+  return token;
+}
 
 function log(message) {
   process.stdout.write(`[acgn-desktop] ${message}${os.EOL}`);
@@ -190,6 +207,7 @@ function needsBuild() {
   const distTime = fs.statSync(DIST_INDEX).mtimeMs;
   const sourceTime = Math.max(
     latestMtime(path.join(ROOT, 'src')),
+    latestMtime(path.join(ROOT, 'public')),
     latestMtime(path.join(ROOT, 'index.html')),
     latestMtime(path.join(ROOT, 'vite.config.js')),
     latestMtime(path.join(ROOT, 'package.json')),
@@ -208,6 +226,7 @@ function ensureProductionBundle() {
     env: {
       ...process.env,
       VITE_LOCAL_API_BASE: DATA_URL,
+      VITE_LOCAL_API_TOKEN: LOCAL_API_TOKEN,
     },
     windowsHide: IS_WINDOWS,
   });
@@ -223,6 +242,12 @@ function resolveStaticPath(requestUrl) {
   return target;
 }
 
+function withRuntimeConfig(html) {
+  const config = JSON.stringify({ baseUrl: DATA_URL, token: LOCAL_API_TOKEN });
+  const script = `<script>window.__ACGN_LOCAL_API__=${config};</script>`;
+  return html.includes('</head>') ? html.replace('</head>', `${script}</head>`) : `${script}${html}`;
+}
+
 function sendFile(response, filePath) {
   const extension = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES.get(extension) || 'application/octet-stream';
@@ -236,6 +261,10 @@ function sendFile(response, filePath) {
       'Content-Type': contentType,
       'Cache-Control': 'no-store',
     });
+    if (filePath === DIST_INDEX) {
+      response.end(withRuntimeConfig(data.toString('utf8')));
+      return;
+    }
     response.end(data);
   });
 }
@@ -284,16 +313,17 @@ async function ensureDataService() {
   }
 
   log(`Starting local data service at ${DATA_URL}...`);
-  spawnManaged('local data service', process.execPath, ['scripts/local-data-server.mjs'], {
+  spawnManaged('local data service', process.execPath, ['server/local-data-server.mjs'], {
     DATA_HOST,
     DATA_PORT: String(DATA_PORT),
+    ACGN_LOCAL_API_TOKEN: LOCAL_API_TOKEN,
     ACGN_DATA_DIR: process.env.ACGN_DATA_DIR || '',
     ACGN_DB_PATH: process.env.ACGN_DB_PATH || '',
   });
 
   const ready = await waitFor(isDataReady, 20000);
   if (!ready) {
-    throw new Error(`Local data service did not become ready. See ${path.basename(LOG_FILE)}.`);
+    throw new Error(`Local data service did not become ready. See ${path.relative(ROOT, LOG_FILE)}.`);
   }
 }
 
@@ -316,7 +346,7 @@ async function ensureAppService() {
 
   const ready = await waitFor(isAppReady, 30000);
   if (!ready) {
-    throw new Error(`App service did not become ready. See ${path.basename(LOG_FILE)}.`);
+    throw new Error(`App service did not become ready. See ${path.relative(ROOT, LOG_FILE)}.`);
   }
 }
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -8,22 +9,38 @@ import { fileURLToPath } from 'node:url';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, '..');
+const RUNTIME_DIR = path.join(ROOT, '.runtime');
+fs.mkdirSync(RUNTIME_DIR, { recursive: true });
 const PORT = Number(process.env.APP_PORT || process.env.PORT || 5188);
 const HOST = process.env.APP_HOST || '127.0.0.1';
 const DATA_PORT = Number(process.env.DATA_PORT || 5198);
 const DATA_HOST = process.env.DATA_HOST || '127.0.0.1';
 const APP_URL = `http://${HOST}:${PORT}`;
 const DATA_URL = `http://${DATA_HOST}:${DATA_PORT}`;
-const PID_FILE = path.join(ROOT, '.dev-server.pid');
-const DATA_PID_FILE = path.join(ROOT, '.local-data-server.pid');
-const LOG_FILE = path.join(ROOT, 'vite-dev-server.log');
-const DATA_LOG_FILE = path.join(ROOT, 'local-data-server.log');
+const TOKEN_FILE = path.join(ROOT, '.local-api-token.local');
+const LOCAL_API_TOKEN = process.env.ACGN_LOCAL_API_TOKEN || readOrCreateLocalApiToken();
+const PID_FILE = path.join(RUNTIME_DIR, '.dev-server.pid');
+const DATA_PID_FILE = path.join(RUNTIME_DIR, '.local-data-server.pid');
+const LOG_FILE = path.join(RUNTIME_DIR, 'vite-dev-server.log');
+const DATA_LOG_FILE = path.join(RUNTIME_DIR, 'local-data-server.log');
 const IS_WINDOWS = process.platform === 'win32';
 const NPM = 'npm';
 
 const args = process.argv.slice(2);
 const command = args.find((arg) => !arg.startsWith('-')) || 'toggle';
 const shouldOpen = !args.includes('--no-open');
+
+function readOrCreateLocalApiToken() {
+  try {
+    const saved = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+    if (saved) return saved;
+  } catch {
+    // No token has been created for this project yet.
+  }
+  const token = randomBytes(24).toString('hex');
+  fs.writeFileSync(TOKEN_FILE, `${token}${os.EOL}`, { mode: 0o600 });
+  return token;
+}
 
 function log(message) {
   process.stdout.write(`[acgn] ${message}${os.EOL}`);
@@ -59,7 +76,8 @@ function normalizePath(value) {
 
 function readPid(file = PID_FILE) {
   try {
-    return Number(fs.readFileSync(file, 'utf8').trim()) || 0;
+    const pidFile = fs.existsSync(file) ? file : path.join(ROOT, path.basename(file));
+    return Number(fs.readFileSync(pidFile, 'utf8').trim()) || 0;
   } catch {
     return 0;
   }
@@ -71,6 +89,7 @@ function writePid(pid, file = PID_FILE) {
 
 function clearPid(file = PID_FILE) {
   fs.rmSync(file, { force: true });
+  fs.rmSync(path.join(ROOT, path.basename(file)), { force: true });
 }
 
 function isPidAlive(pid) {
@@ -233,7 +252,7 @@ async function startDataServer() {
 
   log(`Starting local SQLite data server on ${DATA_URL}...`);
   const out = fs.openSync(DATA_LOG_FILE, 'a');
-  const child = spawn(process.execPath, ['scripts/local-data-server.mjs'], {
+  const child = spawn(process.execPath, ['server/local-data-server.mjs'], {
     cwd: ROOT,
     detached: true,
     stdio: ['ignore', out, out],
@@ -241,6 +260,7 @@ async function startDataServer() {
       ...process.env,
       DATA_PORT: String(DATA_PORT),
       DATA_HOST,
+      ACGN_LOCAL_API_TOKEN: LOCAL_API_TOKEN,
       APP_PORT: String(PORT),
       APP_HOST: HOST,
       APP_ROOT: ROOT,
@@ -254,7 +274,7 @@ async function startDataServer() {
   if (ready) {
     log(`Local data ready: ${DATA_URL}`);
   } else {
-    log(`Local data still starting. Check ${path.basename(DATA_LOG_FILE)}.`);
+    log(`Local data still starting. Check ${path.relative(ROOT, DATA_LOG_FILE)}.`);
   }
   child.unref();
 }
@@ -286,6 +306,7 @@ async function startAppServer() {
       DATA_PORT: String(DATA_PORT),
       DATA_HOST,
       VITE_LOCAL_API_BASE: DATA_URL,
+      VITE_LOCAL_API_TOKEN: LOCAL_API_TOKEN,
     },
     windowsHide: IS_WINDOWS,
   });
@@ -297,7 +318,7 @@ async function startAppServer() {
     log(`Ready: ${APP_URL}`);
     if (shouldOpen) openUrl();
   } else {
-    log(`Still starting. Check ${path.basename(LOG_FILE)} or open ${APP_URL} shortly.`);
+    log(`Still starting. Check ${path.relative(ROOT, LOG_FILE)} or open ${APP_URL} shortly.`);
   }
   child.unref();
 }

@@ -1,5 +1,7 @@
 import { matchRoute, rewritePath, corsHeaders } from './router.js';
 
+const APP_VERSION = '0.8.0';
+
 export default {
   async fetch(request, env) {
     const allowed = env.ALLOWED_ORIGIN || 'https://chibarie.github.io';
@@ -24,7 +26,7 @@ export default {
     headers.delete('referer');
     headers.set(
       'User-Agent',
-      'Mozilla/5.0 (compatible; acgn_journey/0.7.0; +https://github.com/ChibaRie/acgn_journey)',
+      `Mozilla/5.0 (compatible; acgn_journey/${APP_VERSION}; +https://github.com/ChibaRie/acgn_journey)`,
     );
     for (const [k, v] of Object.entries(route.headers)) headers.set(k, v);
 

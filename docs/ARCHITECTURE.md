@@ -36,7 +36,7 @@ flowchart LR
 
 1. 用户运行 `npm run desktop:start`。
 2. `scripts/desktop.mjs` 检查依赖、本机数据服务和前端运行时。
-3. 若服务未运行，启动 `scripts/local-data-server.mjs` 和本机静态应用运行时。
+3. 若服务未运行，启动 `server/local-data-server.mjs` 和本机静态应用运行时。
 4. 启动 Electron，并加载本机前端地址。
 5. 用户关闭窗口后，启动器收掉自己创建的子进程。
 
@@ -215,13 +215,20 @@ App
 
 ```text
 acgn_journey/
+  .github/workflows/
+    deploy.yml
+  docs/
   electron/
     main.mjs
+  public/
+    favicon.svg
   scripts/
     desktop.mjs
     dev-server.mjs
-    local-data-server.mjs
     tag_wordcloud.py
+  server/
+    local-data-server.mjs
+    local-data-server.test.js
   src/
     App.jsx
     main.jsx
@@ -230,7 +237,7 @@ acgn_journey/
     search/
     utils/
   worker/
-  docs/
+  .runtime/          # 日志和 PID 文件，Git 忽略
   package.json
   vite.config.js
 ```

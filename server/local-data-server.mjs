@@ -13,6 +13,8 @@ const MAX_BODY_BYTES = Number(process.env.DATA_MAX_BODY_BYTES || 25 * 1024 * 102
 const LLM_PROFILE_SETTING_KEY = 'llm-profile';
 const LLM_REQUEST_TIMEOUT_MS = Number(process.env.LLM_PROFILE_TIMEOUT_MS || 30_000);
 const DEFAULT_LLM_TEMPERATURE = 0.8;
+const LOCAL_API_TOKEN = String(process.env.ACGN_LOCAL_API_TOKEN || '').trim();
+const LOCAL_API_TOKEN_HEADER = 'x-acgn-local-token';
 
 const ALLOWED_ORIGINS = new Set([
   'https://chibarie.github.io',
@@ -98,7 +100,7 @@ function applyCors(request, response) {
     response.setHeader('Vary', 'Origin');
   }
   response.setHeader('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type,Accept');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type,Accept,X-Acgn-Local-Token');
   response.setHeader('Access-Control-Max-Age', '86400');
 }
 
@@ -494,6 +496,14 @@ function getSettingKey(pathname) {
   return decodeURIComponent(pathname.slice(prefix.length)).trim();
 }
 
+function requireLocalApiToken(request, pathname) {
+  if (!LOCAL_API_TOKEN) return;
+  if (request.method === 'GET' && pathname === '/api/local/health') return;
+  const requestToken = String(request.headers[LOCAL_API_TOKEN_HEADER] || '').trim();
+  if (requestToken === LOCAL_API_TOKEN) return;
+  throw createHttpError(401, 'Local API token is missing or invalid.');
+}
+
 async function handleRequest(request, response) {
   applyCors(request, response);
   if (request.method === 'OPTIONS') {
@@ -508,11 +518,14 @@ async function handleRequest(request, response) {
     throw createHttpError(403, 'Origin is not allowed.');
   }
 
+  requireLocalApiToken(request, pathname);
+
   if (request.method === 'GET' && pathname === '/api/local/health') {
     sendJson(request, response, 200, {
       ok: true,
       app: APP_NAME,
       recordCount: getRecordCount(),
+      requiresToken: Boolean(LOCAL_API_TOKEN),
       storage: storageInfo(),
     });
     return;

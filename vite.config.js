@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
+const packageJson = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+const APP_VERSION = packageJson.version;
+
 const browserLikeHeaders = {
   'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) acgn_journey/0.7.0 Safari/537.36',
+    `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) acgn_journey/${APP_VERSION} Safari/537.36`,
   Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
 };
 
@@ -20,7 +24,7 @@ export default defineConfig({
         secure: true,
         headers: {
           ...browserLikeHeaders,
-          'User-Agent': 'acgn_journey/0.7.0 (local Vite proxy; https://bangumi.github.io/api/)',
+          'User-Agent': `acgn_journey/${APP_VERSION} (local Vite proxy; https://bangumi.github.io/api/)`,
         },
         rewrite: (path) => path.replace(/^\/api\/bangumi/, ''),
       },
@@ -30,7 +34,7 @@ export default defineConfig({
         secure: true,
         headers: {
           ...browserLikeHeaders,
-          'User-Agent': 'acgn_journey/0.7.0 (local Vite proxy; https://bangumi.github.io/api/)',
+          'User-Agent': `acgn_journey/${APP_VERSION} (local Vite proxy; https://bangumi.github.io/api/)`,
         },
         rewrite: (path) => path.replace(/^\/api\/sources\/bangumi/, ''),
       },

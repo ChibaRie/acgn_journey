@@ -61,6 +61,8 @@ npm run app
 - `npm run app:status`：查看运行状态。
 - `npm run dev`：只启动 Vite，适合需要前台日志时使用。
 
+桌面与开发服务的日志、PID 文件集中存放在 `.runtime/`，该目录由启动器自动创建并由 Git 忽略。鉴权令牌保存在根目录的 `.local-api-token.local`，同样由 Git 忽略。
+
 ## 三、GitHub Pages 在线演示
 
 线上地址：
@@ -69,7 +71,7 @@ npm run app
 https://chibarie.github.io/acgn_journey/
 ```
 
-GitHub Pages 只发布静态前端。它无法部署或启动 `scripts/local-data-server.mjs`，因此无法保证像桌面模式一样写入用户设备里的 SQLite。在线演示在本机数据服务不可用时会回退到浏览器 LocalStorage。
+GitHub Pages 只发布静态前端。它无法部署或启动 `server/local-data-server.mjs`，因此无法保证像桌面模式一样写入用户设备里的 SQLite。在线演示在本机数据服务不可用时会回退到浏览器 LocalStorage。
 
 AI 用户画像实验的真实 LLM 调用也只在桌面/本机服务可用时开启；模型列表获取、连通性测试和配置清除都通过本机服务完成。Pages 环境只提供 Prompt 预览和复制，不接收或保存 API Key。
 

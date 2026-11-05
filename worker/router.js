@@ -1,11 +1,13 @@
+const APP_VERSION = '0.8.0';
+
 export const ROUTES = {
   '/api/bangumi': {
     target: 'https://api.bgm.tv',
-    headers: { 'User-Agent': 'acgn_journey/0.7.0 (https://github.com/ChibaRie/acgn_journey)' },
+    headers: { 'User-Agent': `acgn_journey/${APP_VERSION} (https://github.com/ChibaRie/acgn_journey)` },
   },
   '/api/sources/bangumi': {
     target: 'https://api.bgm.tv',
-    headers: { 'User-Agent': 'acgn_journey/0.7.0 (https://github.com/ChibaRie/acgn_journey)' },
+    headers: { 'User-Agent': `acgn_journey/${APP_VERSION} (https://github.com/ChibaRie/acgn_journey)` },
   },
   '/api/age': { target: 'https://www.agedm.io', headers: {} },
   '/api/sources/age': { target: 'https://www.agedm.io', headers: {} },

@@ -143,8 +143,9 @@ function inferWorkCategory(normalized) {
 
 export function getWorkCategory(recordOrType) {
   if (recordOrType && typeof recordOrType === 'object') {
-    const explicit = inferWorkCategory(getSearchText(recordOrType.type || ''));
-    if (explicit !== 'other') return explicit;
+    const type = getSearchText(recordOrType.type || '').trim();
+    const explicit = inferWorkCategory(type);
+    if (explicit !== 'other' || type === 'other' || type === '其他') return explicit;
   }
   return inferWorkCategory(getSearchText(recordOrType));
 }

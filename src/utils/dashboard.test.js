@@ -14,6 +14,8 @@ describe('classification and complete statistics', () => {
     [{ type: '动画', title: 'NEW GAME!', tags: ['游戏改'] }, 'anime'],
     [{ type: '漫画', title: '游戏人生', tags: ['轻小说'] }, 'comic'],
     [{ type: 'book', title: 'NEW GAME!' }, 'novel'],
+    [{ type: '其他', title: '游戏人生', tags: ['轻小说'] }, 'other'],
+    [{ type: ' OTHER ', title: 'NEW GAME!' }, 'other'],
     [{ type: '未分类', title: '视觉小说' }, 'galgame'],
     [{ type: '奇怪媒介', title: '普通作品' }, 'other'],
   ])('gives explicit type precedence over misleading title and tags', (input, category) => {

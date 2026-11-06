@@ -1,6 +1,8 @@
 <div align="center">
   <h1>acgn_journey</h1>
 
+  <p><strong>简体中文</strong> | <a href="./README.en.md">English</a></p>
+
   <p><strong>把看过、读过、玩过的作品，整理成一条可回看的 ACGN 旅程。</strong></p>
 
   <p>
